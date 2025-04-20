@@ -1,0 +1,372 @@
+/* Base Styles */
+.settings-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  .settings-header {
+    margin-bottom: 30px;
+  }
+  
+  .settings-header h1 {
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  /* Tabs Navigation */
+  .settings-tabs {
+    display: flex;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 20px;
+  }
+  
+  .settings-tabs button {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #6c757d;
+  }
+  
+  .settings-tabs button.active {
+    color: #4a6bff;
+    border-bottom-color: #4a6bff;
+  }
+  
+  .settings-tabs button:hover:not(.active) {
+    color: #2c3e50;
+  }
+  
+  /* Content Sections */
+  .settings-content {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  /* User Management */
+  .users-management h2,
+  .access-controls h2,
+  .system-preferences h2,
+  .profile-settings h2 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #2c3e50;
+  }
+  
+  .user-form {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .user-form h3 {
+    margin-top: 0;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  
+  .add-btn,
+  .save-btn,
+  .save-settings-btn,
+  .save-password-btn {
+    background: #4a6bff;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .cancel-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .users-list table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .users-list th,
+  .users-list td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .users-list th {
+    background: #f8f9fa;
+    font-weight: 600;
+  }
+  
+  .role-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  
+  .role-badge.admin {
+    background: #d4edff;
+    color: #004085;
+  }
+  
+  .role-badge.staff {
+    background: #fff3cd;
+    color: #856404;
+  }
+  
+  .role-badge.viewer {
+    background: #e2e3e5;
+    color: #383d41;
+  }
+  
+  .edit-btn,
+  .delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 16px;
+  }
+  
+  .edit-btn {
+    color: #4a6bff;
+  }
+  
+  .delete-btn {
+    color: #dc3545;
+    margin-left: 10px;
+  }
+  
+  /* Access Controls */
+  .access-table table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .access-table th,
+  .access-table td {
+    padding: 12px 15px;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .access-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+  }
+  
+  .access-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+  }
+  
+  .toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 5px;
+  }
+  
+  .toggle-btn .on {
+    color: #28a745;
+  }
+  
+  .toggle-btn .off {
+    color: #dc3545;
+  }
+  
+  .toggle-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  /* System Preferences */
+  .preferences-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .preferences-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .preference-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .warehouse-config {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+  }
+  
+  .config-item label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  
+  .config-item input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  }
+  
+  /* Profile Settings */
+  .profile-picture {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+  
+  .picture-preview {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  
+  .picture-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .picture-upload {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .upload-btn,
+  .remove-btn {
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .upload-btn {
+    background: #4a6bff;
+    color: white;
+    border: none;
+  }
+  
+  .remove-btn {
+    background: none;
+    border: 1px solid #dc3545;
+    color: #dc3545;
+  }
+  
+  .password-change {
+    max-width: 500px;
+  }
+  
+  .password-change .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .password-change label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  
+  .password-change input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  }
+  
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
+    .settings-tabs {
+      flex-wrap: wrap;
+    }
+    
+    .settings-tabs button {
+      flex: 1 0 auto;
+      justify-content: center;
+    }
+    
+    .warehouse-config {
+      grid-template-columns: 1fr 1fr;
+    }
+    
+    .profile-picture {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .warehouse-config {
+      grid-template-columns: 1fr;
+    }
+    
+    .users-list table,
+    .access-table table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
