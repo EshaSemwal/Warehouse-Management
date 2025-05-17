@@ -300,3 +300,81 @@
     height: 50px;
   }
 }
+
+/* Add these to your existing CSS without modifying the rest */
+
+/* Loading and Error States */
+.loading-spinner,
+.error-message {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.2rem;
+  background: white;
+  border-radius: 8px;
+  margin: 2rem 0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.error-message {
+  color: var(--danger);
+}
+
+.error-message svg {
+  margin-right: 0.5rem;
+}
+
+/* No Results Message */
+.no-results {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-light);
+  font-style: italic;
+  background: white;
+}
+
+/* Enhanced Status Colors */
+tr.status-critical {
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+tr.status-critical:hover {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+}
+
+tr.status-low {
+  background-color: rgba(245, 158, 11, 0.05) !important;
+}
+
+tr.status-low:hover {
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
+
+tr.status-healthy {
+  background-color: rgba(16, 185, 129, 0.05) !important;
+}
+
+tr.status-healthy:hover {
+  background-color: rgba(16, 185, 129, 0.08) !important;
+}
+
+/* Additional Category Icons */
+.category-icon.fa-utensils { color: #f59e0b; }
+.category-icon.fa-tshirt { color: #3b82f6; }
+.category-icon.fa-running { color: #10b981; }
+.category-icon.fa-book { color: #8b5cf6; }
+.category-icon.fa-couch { color: #f97316; }
+.category-icon.fa-home { color: #ec4899; }
+.category-icon.fa-wine-bottle { color: #6366f1; }
+
+/* Small adjustment for stock meter alignment */
+.stock-meter {
+  margin: 0 auto;
+}
+
+/* Responsive table cell padding adjustment */
+@media (max-width: 768px) {
+  .inventory-table td, 
+  .inventory-table th {
+    padding: 0.75rem 0.5rem;
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaBoxes, 
   FaSearch, 
@@ -10,39 +10,76 @@ import {
   FaPallet,
   FaChevronLeft,
   FaChevronRight,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaUtensils,
+  FaTshirt,
+  FaRunning,
+  FaBook,
+  FaCouch,
+  FaHome,
+  FaWineBottle
 } from 'react-icons/fa';
 import { CircularProgressbar } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import './inventory.css';
 
 const Inventory = () => {
-  // Sample inventory data
-  const inventoryData = [
-    { id: 'ITEM-1001', name: 'Circuit Board', category: 'Electronics', quantity: 124, location: 'Rack A-12', status: 'In Stock', threshold: 150 },
-    { id: 'ITEM-1002', name: 'Power Drill', category: 'Tools', quantity: 32, location: 'Rack B-05', status: 'Low Stock', threshold: 40 },
-    { id: 'ITEM-1003', name: 'Storage Box', category: 'Packages', quantity: 89, location: 'Rack C-22', status: 'In Stock', threshold: 100 },
-    { id: 'ITEM-1004', name: 'Conveyor Belt', category: 'Machinery', quantity: 5, location: 'Rack D-01', status: 'Critical', threshold: 10 },
-    { id: 'ITEM-1005', name: 'Resistor Pack', category: 'Electronics', quantity: 245, location: 'Rack A-08', status: 'In Stock', threshold: 200 },
-    { id: 'ITEM-1006', name: 'Wrench Set', category: 'Tools', quantity: 18, location: 'Rack B-11', status: 'Low Stock', threshold: 25 },
-    { id: 'ITEM-1007', name: 'Shipping Box', category: 'Packages', quantity: 120, location: 'Rack C-15', status: 'In Stock', threshold: 150 },
-    { id: 'ITEM-1008', name: 'Forklift Part', category: 'Machinery', quantity: 2, location: 'Rack D-03', status: 'Critical', threshold: 5 }
-  ];
-
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
   // State for filters/sorting
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'ProductName', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
+
+  // Fetch data from FastAPI backend
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/inventory');
+        if (!response.ok) {
+          throw new Error('Failed to fetch inventory data');
+        }
+        const data = await response.json();
+        setInventoryData(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchInventory();
+  }, []);
+
+  // Calculate status based on quantity and demand
+  const calculateStatus = (quantity, demand) => {
+    const ratio = quantity / (demand || 1); // Prevent division by zero
+    if (ratio < 0.5) return 'Critical';
+    if (ratio < 1) return 'Low Stock';
+    return 'In Stock';
+  };
+
+  // Process inventory data with calculated status
+  const processedInventory = inventoryData.map(item => ({
+    ...item,
+    status: calculateStatus(item.Quantity, item.DemandPastMonth),
+    threshold: item.DemandPastMonth * 1.2 // 20% buffer over past month's demand
+  }));
+
+  // Get all unique categories from inventory
+  const allCategories = ['All', ...new Set(inventoryData.map(item => item.Category))];
 
   // Filter and sort logic
-  const filteredItems = inventoryData.filter(item => {
+  const filteredItems = processedInventory.filter(item => {
     return (
-      (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       item.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (categoryFilter === 'All' || item.category === categoryFilter) &&
+      (item.ProductName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       item.ProductID.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (categoryFilter === 'All' || item.Category === categoryFilter) &&
       (statusFilter === 'All' || item.status === statusFilter)
     );
   }).sort((a, b) => {
@@ -76,8 +113,15 @@ const Inventory = () => {
     switch(category) {
       case 'Electronics': return <FaMicrochip className="category-icon" />;
       case 'Tools': return <FaToolbox className="category-icon" />;
-      case 'Packages': return <FaBox className="category-icon" />;
-      case 'Machinery': return <FaPallet className="category-icon" />;
+      case 'Groceries': return <FaUtensils className="category-icon" />;
+      case 'Clothing': return <FaTshirt className="category-icon" />;
+      case 'Fitness': return <FaRunning className="category-icon" />;
+      case 'Books': return <FaBook className="category-icon" />;
+      case 'Furniture': return <FaCouch className="category-icon" />;
+      case 'Home Decor': return <FaHome className="category-icon" />;
+      case 'Beverage': return <FaWineBottle className="category-icon" />;
+      case 'Toys and Games': return <FaBox className="category-icon" />;
+      case 'Beauty and Personal Care': return <FaPallet className="category-icon" />;
       default: return <FaBoxes className="category-icon" />;
     }
   };
@@ -85,10 +129,28 @@ const Inventory = () => {
   // Get stock level color
   const getStockLevel = (quantity, threshold) => {
     const percentage = (quantity / threshold) * 100;
-    if (percentage < 20) return 'critical';
-    if (percentage < 50) return 'low';
+    if (percentage < 50) return 'critical';
+    if (percentage < 100) return 'low';
     return 'healthy';
   };
+
+  if (loading) {
+    return (
+      <div className="inventory-container">
+        <div className="loading-spinner">Loading inventory data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="inventory-container">
+        <div className="error-message">
+          <FaExclamationTriangle /> Error loading inventory: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="inventory-container">
@@ -103,7 +165,7 @@ const Inventory = () => {
           <FaSearch className="search-icon" />
           <input
             type="text"
-            placeholder="Search items..."
+            placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -116,11 +178,9 @@ const Inventory = () => {
               value={categoryFilter} 
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
-              <option value="All">All Categories</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Tools">Tools</option>
-              <option value="Packages">Packages</option>
-              <option value="Machinery">Machinery</option>
+              {allCategories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
             </select>
           </div>
 
@@ -144,20 +204,21 @@ const Inventory = () => {
         <table className="inventory-table">
           <thead>
             <tr>
-              <th onClick={() => requestSort('name')}>
+              <th onClick={() => requestSort('ProductName')}>
                 <div className="header-cell">
-                  Item Name
-                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'name' ? 'active' : ''}`} />
+                  Product Name
+                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'ProductName' ? 'active' : ''}`} />
                 </div>
               </th>
               <th>ID</th>
               <th>Category</th>
-              <th onClick={() => requestSort('quantity')}>
+              <th onClick={() => requestSort('Quantity')}>
                 <div className="header-cell">
                   Quantity
-                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'quantity' ? 'active' : ''}`} />
+                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'Quantity' ? 'active' : ''}`} />
                 </div>
               </th>
+              <th>Demand (Past Month)</th>
               <th>Stock Level</th>
               <th>Location</th>
               <th onClick={() => requestSort('status')}>
@@ -169,44 +230,53 @@ const Inventory = () => {
             </tr>
           </thead>
           <tbody>
-            {currentItems.map((item) => (
-              <tr key={item.id} className={`status-${getStockLevel(item.quantity, item.threshold)}`}>
-                <td>{item.name}</td>
-                <td className="item-id">{item.id}</td>
-                <td>
-                  <div className="category-cell">
-                    {getCategoryIcon(item.category)}
-                    {item.category}
-                  </div>
-                </td>
-                <td>{item.quantity}</td>
-                <td>
-                  <div className="stock-meter">
-                    <CircularProgressbar
-                      value={(item.quantity / item.threshold) * 100}
-                      text={`${Math.round((item.quantity / item.threshold) * 100)}%`}
-                      styles={{
-                        path: {
-                          stroke: getStockLevel(item.quantity, item.threshold) === 'critical' ? '#ef4444' : 
-                                 getStockLevel(item.quantity, item.threshold) === 'low' ? '#f59e0b' : '#10b981'
-                        },
-                        text: {
-                          fill: '#1e293b',
-                          fontSize: '24px',
-                        }
-                      }}
-                    />
-                  </div>
-                </td>
-                <td>{item.location}</td>
-                <td>
-                  <div className="status-cell">
-                    {item.status === 'Critical' && <FaExclamationTriangle className="warning-icon" />}
-                    {item.status}
-                  </div>
+            {currentItems.length > 0 ? (
+              currentItems.map((item) => (
+                <tr key={item.ProductID} className={`status-${getStockLevel(item.Quantity, item.threshold)}`}>
+                  <td>{item.ProductName}</td>
+                  <td className="item-id">{item.ProductID}</td>
+                  <td>
+                    <div className="category-cell">
+                      {getCategoryIcon(item.Category)}
+                      {item.Category}
+                    </div>
+                  </td>
+                  <td>{item.Quantity}</td>
+                  <td>{item.DemandPastMonth}</td>
+                  <td>
+                    <div className="stock-meter">
+                      <CircularProgressbar
+                        value={(item.Quantity / item.threshold) * 100}
+                        text={`${Math.round((item.Quantity / item.threshold) * 100)}%`}
+                        styles={{
+                          path: {
+                            stroke: getStockLevel(item.Quantity, item.threshold) === 'critical' ? '#ef4444' : 
+                                   getStockLevel(item.Quantity, item.threshold) === 'low' ? '#f59e0b' : '#10b981'
+                          },
+                          text: {
+                            fill: '#1e293b',
+                            fontSize: '24px',
+                          }
+                        }}
+                      />
+                    </div>
+                  </td>
+                  <td>{item.ShelfLocation}</td>
+                  <td>
+                    <div className="status-cell">
+                      {item.status === 'Critical' && <FaExclamationTriangle className="warning-icon" />}
+                      {item.status}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="8" className="no-results">
+                  No inventory items found matching your filters
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -243,16 +313,16 @@ const Inventory = () => {
       {/* Summary Stats */}
       <div className="summary-stats">
         <div className="stat-card">
-          <h3>Total Items</h3>
-          <p>{inventoryData.length}</p>
+          <h3>Total Products</h3>
+          <p>{processedInventory.length}</p>
         </div>
         <div className="stat-card">
           <h3>Low Stock Items</h3>
-          <p>{inventoryData.filter(item => item.status === 'Low Stock').length}</p>
+          <p>{processedInventory.filter(item => item.status === 'Low Stock').length}</p>
         </div>
         <div className="stat-card">
           <h3>Critical Items</h3>
-          <p>{inventoryData.filter(item => item.status === 'Critical').length}</p>
+          <p>{processedInventory.filter(item => item.status === 'Critical').length}</p>
         </div>
       </div>
     </div>

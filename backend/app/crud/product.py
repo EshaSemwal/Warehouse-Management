@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models.product import ProductInventory
+from backend.app.models.inventory import ProductInventory
 from app.schemas.product import ProductCreate
 
 def get_product(db: Session, product_id: str):
