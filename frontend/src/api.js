@@ -5,6 +5,14 @@ export const getProducts = async () => {
   return await response.json();
 };
 
+export const getProduct = async (id) => {
+  const response = await fetch(`${API_BASE}/products/${id}/`);
+  if (!response.ok) {
+    throw new Error(`Product with ID ${id} not found`);
+  }
+  return await response.json();
+};
+
 export const createProduct = async (productData) => {
   const response = await fetch(`${API_BASE}/products/`, {
     method: "POST",
