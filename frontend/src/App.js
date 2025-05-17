@@ -10,6 +10,8 @@ import Analytics from './pages/analytics';
 import Settings from './pages/settings';
 import Login from './pages/login';
 import Signup from './pages/signup';
+import ProductList from "./components/ProductList";
+import ProductDetail from "./components/ProductDetail";
 import './App.css';
 
 function App() {
@@ -39,11 +41,16 @@ function App() {
             {/* Analytics & Reports */}
             <Route path="/analytics" element={<Analytics />} />
             
+            {/* Settings */}
             <Route path="/settings" element={<Settings />} />
             
             {/* Authentication */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            
+            {/* Product Routes */}
+            <Route path="/products" element={<ProductList />} />
+            <Route path="/products/:productId" element={<ProductDetail />} />
           </Routes>
         </div>
         
