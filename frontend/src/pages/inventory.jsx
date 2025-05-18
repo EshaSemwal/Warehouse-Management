@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FaBoxes, 
-  FaSearch, 
-  FaFilter, 
+import {
+  FaBoxes,
+  FaSearch,
+  FaFilter,
   FaSortAmountDown,
   FaMicrochip,
   FaToolbox,
@@ -31,8 +31,7 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [rearranging, setRearranging] = useState(false);
-  
-  // State for filters/sorting
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -40,7 +39,6 @@ const Inventory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Fetch data from FastAPI backend
   useEffect(() => {
     fetchInventory();
   }, []);
@@ -48,7 +46,7 @@ const Inventory = () => {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/product-inventory');
+      const response = await fetch('http://localhost:8000/api/inventory');
       if (!response.ok) {
         throw new Error('Failed to fetch inventory data');
       }
@@ -61,28 +59,26 @@ const Inventory = () => {
     }
   };
 
-  // Calculate status based on quantity and demand
   const calculateStatus = (quantity, demand) => {
-    const ratio = quantity / (demand || 1); // Prevent division by zero
+    const ratio = quantity / (demand || 1);
     if (ratio < 0.5) return 'Critical';
     if (ratio < 1) return 'Low Stock';
     return 'In Stock';
   };
 
-  // Handle inventory rearrangement
   const handleRearrange = async () => {
     setRearranging(true);
     try {
       const response = await fetch('http://localhost:8000/api/rearrange-inventory', {
         method: 'POST'
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to rearrange inventory');
       }
-      
+
       message.success('Inventory rearranged successfully!');
-      fetchInventory(); // Refresh the data
+      fetchInventory();
     } catch (err) {
       message.error('Error rearranging inventory');
       console.error('Rearrangement error:', err);
@@ -91,22 +87,19 @@ const Inventory = () => {
     }
   };
 
-  // Process inventory data with calculated status
   const processedInventory = inventoryData.map(item => ({
     ...item,
     status: calculateStatus(item.Quantity, item.DemandPastMonth),
-    threshold: item.DemandPastMonth * 1.2, // 20% buffer over past month's demand
-    location: item.rack || item.ShelfLocation // Fallback to ShelfLocation if rack not available
+    threshold: item.DemandPastMonth * 1.2,
+    location: item.rack || item.ShelfLocation
   }));
 
-  // Get all unique categories from inventory
   const allCategories = ['All', ...new Set(inventoryData.map(item => item.Category))];
 
-  // Filter and sort logic
   const filteredItems = processedInventory.filter(item => {
     return (
       (item.ProductName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.ProductID.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        item.ProductID.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (categoryFilter === 'All' || item.Category === categoryFilter) &&
       (statusFilter === 'All' || item.status === statusFilter)
     );
@@ -120,14 +113,12 @@ const Inventory = () => {
     return 0;
   });
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const currentItems = filteredItems.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Sort request
   const requestSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -136,9 +127,8 @@ const Inventory = () => {
     setSortConfig({ key, direction });
   };
 
-  // Get category icon
   const getCategoryIcon = (category) => {
-    switch(category) {
+    switch (category) {
       case 'Electronics': return <FaMicrochip className="category-icon" />;
       case 'Tools': return <FaToolbox className="category-icon" />;
       case 'Groceries': return <FaUtensils className="category-icon" />;
@@ -154,7 +144,6 @@ const Inventory = () => {
     }
   };
 
-  // Get stock level color
   const getStockLevel = (quantity, threshold) => {
     const percentage = (quantity / threshold) * 100;
     if (percentage < 50) return 'critical';
@@ -162,7 +151,6 @@ const Inventory = () => {
     return 'healthy';
   };
 
-  // Get zone color
   const getZoneColor = (zone) => {
     const colors = {
       'A': 'green',
@@ -204,7 +192,6 @@ const Inventory = () => {
         <p>Optimized storage with dynamic arrangement</p>
       </header>
 
-      {/* Controls Section */}
       <div className="controls-section">
         <div className="search-bar">
           <FaSearch className="search-icon" />
@@ -219,10 +206,7 @@ const Inventory = () => {
         <div className="filters">
           <div className="filter-group">
             <label><FaFilter /> Category:</label>
-            <select 
-              value={categoryFilter} 
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
               {allCategories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
@@ -231,10 +215,7 @@ const Inventory = () => {
 
           <div className="filter-group">
             <label><FaFilter /> Status:</label>
-            <select 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="All">All Statuses</option>
               <option value="In Stock">In Stock</option>
               <option value="Low Stock">Low Stock</option>
@@ -242,9 +223,9 @@ const Inventory = () => {
             </select>
           </div>
 
-          <Button 
-            type="primary" 
-            icon={<FaRedo />} 
+          <Button
+            type="primary"
+            icon={<FaRedo />}
             loading={rearranging}
             onClick={handleRearrange}
             className="rearrange-btn"
@@ -254,7 +235,6 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Inventory Table */}
       <div className="inventory-table-container">
         <table className="inventory-table">
           <thead>
@@ -304,7 +284,7 @@ const Inventory = () => {
           </thead>
           <tbody>
             {currentItems.length > 0 ? (
-              currentItems.map((item) => (
+              currentItems.map(item => (
                 <tr key={item.ProductID} className={`status-${getStockLevel(item.Quantity, item.threshold)}`}>
                   <td>{item.ProductName}</td>
                   <td className="item-id">{item.ProductID}</td>
@@ -344,16 +324,15 @@ const Inventory = () => {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="pagination">
-          <button 
+          <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
           >
             <FaChevronLeft />
           </button>
-          
+
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
             <button
               key={page}
@@ -363,8 +342,8 @@ const Inventory = () => {
               {page}
             </button>
           ))}
-          
-          <button 
+
+          <button
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
           >
@@ -373,7 +352,6 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* Summary Stats */}
       <div className="summary-stats">
         <div className="stat-card">
           <h3>Total Products</h3>
