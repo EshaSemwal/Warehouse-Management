@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, Text
 from app.database import Base
 
+# In backend/app/models/item.py - Update to match MySQL exactly:
 class ProductInventory(Base):
     __tablename__ = "product_inventory"
     
@@ -9,9 +10,10 @@ class ProductInventory(Base):
     Category = Column(Text)
     Quantity = Column(Integer)
     DemandPastMonth = Column(Integer)
+    Price = Column(Float)  # Added missing column
     Zone = Column(Text)
-    shelf = Column(String(10))
-    rack = Column(String(10))
+    ShelfLocation = Column(Text)  # Changed from 'shelf'
+    RackLocation = Column(Text)   # Changed from 'rack'
     IndividualWeight_kg = Column(Float)
     TotalWeight_kg = Column(Float)
-    location = Column(String(20))
+    # Removed 'location' as it doesn't exist in MySQL

@@ -8,9 +8,14 @@ export default function ProductList() {
     ProductName: "",
     Category: "",
     Quantity: 0,
+    DemandPastMonth: 0,
     Price: 0,
-    ShelfLocation: ""
-  });
+    Zone: "",
+    ShelfLocation: "",
+    RackLocation: "",
+    IndividualWeight_kg: 0,
+    TotalWeight_kg: 0
+});
 
   useEffect(() => {
     loadProducts();
@@ -48,9 +53,14 @@ export default function ProductList() {
             <th>ID</th>
             <th>Name</th>
             <th>Category</th>
-            <th>Quantity</th>
+            <th>Qty</th>
+            <th>Demand</th>
             <th>Price</th>
-            <th>Location</th>
+            <th>Zone</th>
+            <th>Shelf</th>
+            <th>Rack</th>
+            <th>Unit Wt</th>
+            <th>Total Wt</th>
           </tr>
         </thead>
         <tbody>
