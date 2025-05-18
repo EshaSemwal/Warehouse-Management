@@ -67,25 +67,16 @@ const Inventory = () => {
   };
 
   const handleRearrange = async () => {
-    setRearranging(true);
-    try {
-      const response = await fetch('http://localhost:8000/api/rearrange-inventory/', {
-        method: 'POST'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to rearrange inventory');
-      }
-
-      message.success('Inventory rearranged successfully!');
-      fetchInventory();
-    } catch (err) {
-      message.error('Error rearranging inventory');
-      console.error('Rearrangement error:', err);
-    } finally {
-      setRearranging(false);
-    }
-  };
+  setRearranging(true);
+  try {
+    await fetch('http://localhost:8000/api/inventory/optimize', { method: 'POST' });
+    await fetchInventory(); // Refresh inventory data
+  } catch (err) {
+    // handle error
+  } finally {
+    setRearranging(false);
+  }
+};
 
   const processedInventory = inventoryData.map(item => ({
     ...item,
@@ -303,8 +294,8 @@ const Inventory = () => {
                       {item.Zone}
                     </span>
                   </td>
-                  <td>{item.shelf}</td>
-                  <td>{item.rack}</td>
+                  <td>{item.ShelfLocation}</td>
+<td>{item.RackLocation}</td>
                   <td>
                     <div className="status-cell">
                       {item.status === 'Critical' && <FaExclamationTriangle className="warning-icon" />}

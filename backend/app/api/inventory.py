@@ -4,8 +4,15 @@ from typing import List
 from app.models.item import ProductInventory
 from .. import schemas
 from ..database import get_db
+from app.services.arrangement import WarehouseArranger
+from app.database import get_db
 
 router = APIRouter(prefix="/inventory")
+
+@router.post("/optimize")
+def optimize_storage(db: Session = Depends(get_db)):
+    WarehouseArranger.rearrange_inventory(db)
+    return {"message": "Storage optimized"}
 
 @router.get("/", response_model=List[schemas.InventoryBase])
 

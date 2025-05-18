@@ -1,6 +1,6 @@
-from typing import List, Dict
 from app.models.item import ProductInventory
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 class WarehouseArranger:
     ZONE_MAPPING = {
@@ -15,76 +15,60 @@ class WarehouseArranger:
         "stationery": "I",
         "home decor": "J"
     }
-    
+
     @staticmethod
     def get_zone(category: str) -> str:
         return WarehouseArranger.ZONE_MAPPING.get(category.lower(), "Z")
     
     @staticmethod
     def rearrange_inventory(db: Session):
-        # Clear existing rack capacity data
-        db.execute("TRUNCATE TABLE rack_capacity")
-        
-        # Get all items sorted by demand (descending)
+        db.execute(text("TRUNCATE TABLE rack_capacity"))
         items = db.query(ProductInventory).order_by(ProductInventory.DemandPastMonth.desc()).all()
-        
         for item in items:
-            # Calculate total weight if not already set
             if not item.TotalWeight_kg:
                 item.TotalWeight_kg = item.IndividualWeight_kg * item.Quantity
-            
-            # Set zone based on category
             item.Zone = WarehouseArranger.get_zone(item.Category)
-            
             remaining_quantity = item.Quantity
             current_shelf = 1
             current_rack = 1
-            
+            shelf_numbers = []
+            rack_numbers = []
             while remaining_quantity > 0:
-                rack_id = f"{item.Zone}{current_shelf}-{current_rack}"
-                
-                # Check rack capacity
                 rack = db.execute(
                     f"SELECT used_weight FROM rack_capacity WHERE zone = '{item.Zone}' AND shelf = '{current_shelf}' AND rack = '{current_rack}'"
                 ).fetchone()
-                
                 available_capacity = 100 - (rack.used_weight if rack else 0)
-                
                 if available_capacity <= 0:
                     current_rack += 1
                     if current_rack > 10:
                         current_shelf += 1
                         current_rack = 1
                     continue
-                
-                # Calculate how much we can place in this rack
                 weight_to_place = min(
                     remaining_quantity * item.IndividualWeight_kg,
                     available_capacity
                 )
                 quantity_to_place = int(weight_to_place / item.IndividualWeight_kg)
-                
-                # Update rack capacity
+                if quantity_to_place == 0 and remaining_quantity > 0:
+                    quantity_to_place = 1
                 if rack:
                     db.execute(
-                        f"UPDATE rack_capacity SET used_weight = used_weight + {weight_to_place} "
+                        f"UPDATE rack_capacity SET used_weight = used_weight + {quantity_to_place * item.IndividualWeight_kg} "
                         f"WHERE zone = '{item.Zone}' AND shelf = '{current_shelf}' AND rack = '{current_rack}'"
                     )
                 else:
                     db.execute(
                         f"INSERT INTO rack_capacity (zone, shelf, rack, used_weight) "
-                        f"VALUES ('{item.Zone}', '{current_shelf}', '{current_rack}', {weight_to_place})"
+                        f"VALUES ('{item.Zone}', '{current_shelf}', '{current_rack}', {quantity_to_place * item.IndividualWeight_kg})"
                     )
-                
-                # Update item location
-                item.shelf = f"{item.Zone}{current_shelf}"
-                item.rack = f"{item.Zone}{current_shelf}-{current_rack}"
-                item.location = f"{item.Zone}-{current_shelf}-{current_rack}"
-                
+                # Only append the numbers, not the zone
+                shelf_numbers.append(str(current_shelf))
+                rack_numbers.append(str(current_rack))
                 remaining_quantity -= quantity_to_place
                 current_rack += 1
                 if current_rack > 10:
                     current_shelf += 1
                     current_rack = 1
-            
-            db.commit()
+            item.ShelfLocation = ",".join(shelf_numbers)
+            item.RackLocation = ",".join(rack_numbers)
+        db.commit()
