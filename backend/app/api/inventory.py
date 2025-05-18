@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.models.inventory import InventoryItem
+from backend.app.models.item import InventoryItem
 from app.database import get_db
 from app.schemas import InventoryItemBase
 from typing import List

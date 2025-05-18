@@ -17,16 +17,20 @@ import {
   FaBook,
   FaCouch,
   FaHome,
-  FaWineBottle
+  FaWineBottle,
+  FaRedo,
+  FaWeightHanging
 } from 'react-icons/fa';
 import { CircularProgressbar } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
+import { Button, message } from 'antd';
 import './inventory.css';
 
 const Inventory = () => {
   const [inventoryData, setInventoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [rearranging, setRearranging] = useState(false);
   
   // State for filters/sorting
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,23 +42,24 @@ const Inventory = () => {
 
   // Fetch data from FastAPI backend
   useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/inventory');
-        if (!response.ok) {
-          throw new Error('Failed to fetch inventory data');
-        }
-        const data = await response.json();
-        setInventoryData(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchInventory();
   }, []);
+
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8000/api/product-inventory');
+      if (!response.ok) {
+        throw new Error('Failed to fetch inventory data');
+      }
+      const data = await response.json();
+      setInventoryData(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Calculate status based on quantity and demand
   const calculateStatus = (quantity, demand) => {
@@ -64,11 +69,34 @@ const Inventory = () => {
     return 'In Stock';
   };
 
+  // Handle inventory rearrangement
+  const handleRearrange = async () => {
+    setRearranging(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/rearrange-inventory', {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to rearrange inventory');
+      }
+      
+      message.success('Inventory rearranged successfully!');
+      fetchInventory(); // Refresh the data
+    } catch (err) {
+      message.error('Error rearranging inventory');
+      console.error('Rearrangement error:', err);
+    } finally {
+      setRearranging(false);
+    }
+  };
+
   // Process inventory data with calculated status
   const processedInventory = inventoryData.map(item => ({
     ...item,
     status: calculateStatus(item.Quantity, item.DemandPastMonth),
-    threshold: item.DemandPastMonth * 1.2 // 20% buffer over past month's demand
+    threshold: item.DemandPastMonth * 1.2, // 20% buffer over past month's demand
+    location: item.rack || item.ShelfLocation // Fallback to ShelfLocation if rack not available
   }));
 
   // Get all unique categories from inventory
@@ -78,7 +106,7 @@ const Inventory = () => {
   const filteredItems = processedInventory.filter(item => {
     return (
       (item.ProductName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       item.ProductID.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      item.ProductID.toLowerCase().includes(searchTerm.toLowerCase())) &&
       (categoryFilter === 'All' || item.Category === categoryFilter) &&
       (statusFilter === 'All' || item.status === statusFilter)
     );
@@ -134,6 +162,23 @@ const Inventory = () => {
     return 'healthy';
   };
 
+  // Get zone color
+  const getZoneColor = (zone) => {
+    const colors = {
+      'A': 'green',
+      'B': 'blue',
+      'C': 'orange',
+      'D': 'purple',
+      'F': 'red',
+      'G': 'cyan',
+      'H': 'geekblue',
+      'I': 'lime',
+      'J': 'gold',
+      'Z': 'gray'
+    };
+    return colors[zone] || 'gray';
+  };
+
   if (loading) {
     return (
       <div className="inventory-container">
@@ -155,8 +200,8 @@ const Inventory = () => {
   return (
     <div className="inventory-container">
       <header className="inventory-header">
-        <h1><FaBoxes /> Inventory Management</h1>
-        <p>Real-time stock monitoring and control</p>
+        <h1><FaBoxes /> Warehouse Inventory Management</h1>
+        <p>Optimized storage with dynamic arrangement</p>
       </header>
 
       {/* Controls Section */}
@@ -196,6 +241,16 @@ const Inventory = () => {
               <option value="Critical">Critical</option>
             </select>
           </div>
+
+          <Button 
+            type="primary" 
+            icon={<FaRedo />} 
+            loading={rearranging}
+            onClick={handleRearrange}
+            className="rearrange-btn"
+          >
+            Optimize Storage
+          </Button>
         </div>
       </div>
 
@@ -218,9 +273,27 @@ const Inventory = () => {
                   <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'Quantity' ? 'active' : ''}`} />
                 </div>
               </th>
-              <th>Demand (Past Month)</th>
-              <th>Stock Level</th>
-              <th>Location</th>
+              <th onClick={() => requestSort('DemandPastMonth')}>
+                <div className="header-cell">
+                  Demand
+                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'DemandPastMonth' ? 'active' : ''}`} />
+                </div>
+              </th>
+              <th onClick={() => requestSort('IndividualWeight_kg')}>
+                <div className="header-cell">
+                  <FaWeightHanging /> Unit Wt.
+                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'IndividualWeight_kg' ? 'active' : ''}`} />
+                </div>
+              </th>
+              <th onClick={() => requestSort('TotalWeight_kg')}>
+                <div className="header-cell">
+                  <FaWeightHanging /> Total Wt.
+                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'TotalWeight_kg' ? 'active' : ''}`} />
+                </div>
+              </th>
+              <th>Zone</th>
+              <th>Shelf</th>
+              <th>Rack</th>
               <th onClick={() => requestSort('status')}>
                 <div className="header-cell">
                   Status
@@ -243,25 +316,15 @@ const Inventory = () => {
                   </td>
                   <td>{item.Quantity}</td>
                   <td>{item.DemandPastMonth}</td>
+                  <td>{item.IndividualWeight_kg.toFixed(2)} kg</td>
+                  <td>{item.TotalWeight_kg.toFixed(2)} kg</td>
                   <td>
-                    <div className="stock-meter">
-                      <CircularProgressbar
-                        value={(item.Quantity / item.threshold) * 100}
-                        text={`${Math.round((item.Quantity / item.threshold) * 100)}%`}
-                        styles={{
-                          path: {
-                            stroke: getStockLevel(item.Quantity, item.threshold) === 'critical' ? '#ef4444' : 
-                                   getStockLevel(item.Quantity, item.threshold) === 'low' ? '#f59e0b' : '#10b981'
-                          },
-                          text: {
-                            fill: '#1e293b',
-                            fontSize: '24px',
-                          }
-                        }}
-                      />
-                    </div>
+                    <span className="zone-tag" style={{ backgroundColor: getZoneColor(item.Zone) }}>
+                      {item.Zone}
+                    </span>
                   </td>
-                  <td>{item.ShelfLocation}</td>
+                  <td>{item.shelf}</td>
+                  <td>{item.rack}</td>
                   <td>
                     <div className="status-cell">
                       {item.status === 'Critical' && <FaExclamationTriangle className="warning-icon" />}
@@ -272,7 +335,7 @@ const Inventory = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="no-results">
+                <td colSpan="11" className="no-results">
                   No inventory items found matching your filters
                 </td>
               </tr>
@@ -323,6 +386,10 @@ const Inventory = () => {
         <div className="stat-card">
           <h3>Critical Items</h3>
           <p>{processedInventory.filter(item => item.status === 'Critical').length}</p>
+        </div>
+        <div className="stat-card">
+          <h3>Zones Used</h3>
+          <p>{new Set(processedInventory.map(item => item.Zone)).size}</p>
         </div>
       </div>
     </div>
