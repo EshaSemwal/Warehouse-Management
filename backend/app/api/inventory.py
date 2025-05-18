@@ -1,52 +1,48 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
-# Add these imports
-from app.schemas.inventory import (
-    InventoryItemBase,
-    InventoryItemCreate,
-    InventoryItemUpdate
-)
 from app.models.item import ProductInventory
-from app.database import get_db
+from .. import schemas
+from ..database import get_db
 
-router = APIRouter(prefix="/api", tags=["inventory"])
+router = APIRouter(prefix="/inventory")
 
-# Updated GET endpoint
-@router.get("/inventory", response_model=List[InventoryItemBase])
+@router.get("/", response_model=List[schemas.InventoryBase])
+
 def get_inventory(db: Session = Depends(get_db)):
-    try:
-        return db.query(ProductInventory).all()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    return db.query(ProductInventory).all()
 
-# New POST endpoint (for creating items)
-@router.post("/inventory", response_model=InventoryItemBase)
-def create_item(
-    item: InventoryItemCreate,  # This will auto-validate the input
-    db: Session = Depends(get_db)
-):
+@router.post("/", response_model=schemas.InventoryBase, status_code=201)
+def create_item(item: schemas.InventoryCreate, db: Session = Depends(get_db)):
     db_item = ProductInventory(**item.dict())
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
     return db_item
 
-# New PATCH endpoint (for partial updates)
-@router.patch("/inventory/{product_id}", response_model=InventoryItemBase)
+@router.patch("/{product_id}", response_model=schemas.InventoryBase)
 def update_item(
     product_id: str,
-    item_update: InventoryItemUpdate,  # Only allows updating specific fields
+    item: schemas.InventoryUpdate,
     db: Session = Depends(get_db)
 ):
-    db_item = db.query(ProductInventory).filter(ProductInventory.ProductID == product_id).first()
-    if not db_item:
-        raise HTTPException(status_code=404, detail="Item not found")
+    db_item = db.query(ProductInventory).filter(
+        ProductInventory.ProductID == product_id
+    ).first()
     
-    update_data = item_update.dict(exclude_unset=True)
+    if not db_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product {product_id} not found"
+        )
+    
+    update_data = item.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_item, field, value)
+    
+    # Recalculate total weight if relevant fields change
+    if 'Quantity' in update_data or 'IndividualWeight_kg' in update_data:
+        db_item.TotalWeight_kg = db_item.Quantity * db_item.IndividualWeight_kg
     
     db.commit()
     db.refresh(db_item)

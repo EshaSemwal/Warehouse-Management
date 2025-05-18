@@ -15,7 +15,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(inventory_router)
+app.include_router(inventory_router, prefix="/api")
 
 # Create tables (only needed if using SQLAlchemy to create tables)
 Base.metadata.create_all(bind=engine)

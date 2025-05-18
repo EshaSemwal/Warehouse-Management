@@ -49,32 +49,46 @@ export default function ProductList() {
       <h2>Product Inventory</h2>
       <table>
         <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Qty</th>
-            <th>Demand</th>
-            <th>Price</th>
-            <th>Zone</th>
-            <th>Shelf</th>
-            <th>Rack</th>
-            <th>Unit Wt</th>
-            <th>Total Wt</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((product) => (
-            <tr key={product.ProductID}>
-              <td>{product.ProductID}</td>
-              <td>{product.ProductName}</td>
-              <td>{product.Category}</td>
-              <td>{product.Quantity}</td>
-              <td>${product.Price.toFixed(2)}</td>
-              <td>{product.ShelfLocation}</td>
-            </tr>
-          ))}
-        </tbody>
+  <tr>
+    <th>Product ID</th>
+    <th>Name</th>
+    <th>Category</th>
+    <th>Quantity</th>
+    <th>Demand (Past Month)</th>
+    <th>Price</th>
+    <th>Zone</th>
+    <th>Shelf</th>
+    <th>Rack</th>
+    <th>Individual Weight (kg)</th>
+    <th>Total Weight (kg)</th>
+    <th>Status</th>
+    <th>Action</th>
+  </tr>
+</thead>
+<tbody>
+  {currentProducts.map(product => (
+    <tr key={product.ProductID}>
+      <td>{product.ProductID}</td>
+      <td>{product.ProductName}</td>
+      <td>{product.Category}</td>
+      <td>{product.Quantity}</td>
+      <td>{product.DemandPastMonth}</td>
+      <td>${product.Price.toFixed(2)}</td>
+      <td>{product.Zone}</td>
+      <td>{product.ShelfLocation}</td>
+      <td>{product.RackLocation}</td>
+      <td>{product.IndividualWeight_kg} kg</td>
+      <td>{product.TotalWeight_kg} kg</td>
+      <td>{calculateStatus(product.Quantity, product.DemandPastMonth)}</td>
+      <td>
+        <Link to={`/products/${product.ProductID}`}>
+          <Button type="primary" size="small">View</Button>
+        </Link>
+      </td>
+    </tr>
+  ))}
+</tbody>
+
       </table>
     </div>
   );

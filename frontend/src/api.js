@@ -1,7 +1,7 @@
 const API_BASE = "http://localhost:8000/api";
 
 export const getInventory = async () => {
-  const response = await fetch(`${API_BASE}/inventory`);
+  const response = await fetch(`${API_BASE}/inventory/`);
   if (!response.ok) {
     throw new Error("Failed to fetch inventory data");
   }

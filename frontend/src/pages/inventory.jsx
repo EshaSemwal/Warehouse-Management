@@ -46,7 +46,7 @@ const Inventory = () => {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/inventory');
+      const response = await fetch('http://localhost:8000/api/inventory/');
       if (!response.ok) {
         throw new Error('Failed to fetch inventory data');
       }
@@ -69,7 +69,7 @@ const Inventory = () => {
   const handleRearrange = async () => {
     setRearranging(true);
     try {
-      const response = await fetch('http://localhost:8000/api/rearrange-inventory', {
+      const response = await fetch('http://localhost:8000/api/rearrange-inventory/', {
         method: 'POST'
       });
 

@@ -1,35 +1,50 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-class InventoryItemBase(BaseModel):
-    ProductID: str = Field(..., example="P0001")
-    ProductName: str = Field(..., min_length=1, max_length=100)
-    Category: str
-    Quantity: int = Field(..., ge=0)
+class InventoryBase(BaseModel):
+    ProductID: str = Field(..., pattern=r'^P\d{4}$', example="P0001")
+    ProductName: str = Field(...)
+    Category: str = Field(...)
+    Quantity: int = Field(..., ge=0, le=10000)
     DemandPastMonth: int = Field(..., ge=0)
-    Price: float = Field(..., gt=0)
-    Zone: str = Field(..., max_length=1)
-    ShelfLocation: str
-    RackLocation: Optional[str] = None
+    Price: float = Field(..., gt=0, le=1000000)
+    Zone: str = Field(..., pattern=r'^[A-Z]$')
+    ShelfLocation: str = Field(..., pattern=r'^[A-Z]\d+$')
+    RackLocation: Optional[str] = Field(None, pattern=r'^[A-Z]?\d*$')
     IndividualWeight_kg: float = Field(..., ge=0)
     TotalWeight_kg: float = Field(..., ge=0)
 
-    class Config:
-        orm_mode = True
-
-    @validator('TotalWeight_kg')
-    def validate_total_weight(cls, v, values):
-        if 'IndividualWeight_kg' in values and 'Quantity' in values:
-            expected = values['IndividualWeight_kg'] * values['Quantity']
-            if abs(v - expected) > 0.01:  # Allow small floating point differences
+    @field_validator('TotalWeight_kg')
+    def validate_weight(cls, v, values):
+        if 'IndividualWeight_kg' in values.data and 'Quantity' in values.data:
+            if abs(v - (values.data['IndividualWeight_kg'] * values.data['Quantity'])) > 0.001:
                 raise ValueError("Total weight must equal individual weight × quantity")
         return v
 
-class InventoryItemCreate(InventoryItemBase):
+    class Config:
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "ProductID": "P0101",
+                "ProductName": "Premium Widget",
+                "Category": "Electronics",
+                "Quantity": 100,
+                "DemandPastMonth": 80,
+                "Price": 29.99,
+                "Zone": "A",
+                "ShelfLocation": "A1",
+                "RackLocation": "R1",
+                "IndividualWeight_kg": 0.5,
+                "TotalWeight_kg": 50.0
+            }
+        }
+
+class InventoryCreate(InventoryBase):
     pass
 
-class InventoryItemUpdate(BaseModel):
-    Quantity: Optional[int] = Field(None, ge=0)
+class InventoryUpdate(BaseModel):
+    ProductName: Optional[str] = None
+    Quantity: Optional[int] = None
+    Price: Optional[float] = None
     ShelfLocation: Optional[str] = None
     RackLocation: Optional[str] = None
-    Price: Optional[float] = Field(None, gt=0)
