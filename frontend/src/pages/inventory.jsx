@@ -256,10 +256,10 @@ const Inventory = () => {
                   <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'IndividualWeight_kg' ? 'active' : ''}`} />
                 </div>
               </th>
-              <th onClick={() => requestSort('TotalWeight_kg')}>
+              <th onClick={() => requestSort('Price')}>
                 <div className="header-cell">
-                  <FaWeightHanging /> Total Wt.
-                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'TotalWeight_kg' ? 'active' : ''}`} />
+                  Price
+                  <FaSortAmountDown className={`sort-icon ${sortConfig.key === 'Price' ? 'active' : ''}`} />
                 </div>
               </th>
               <th>Zone</th>
@@ -288,14 +288,14 @@ const Inventory = () => {
                   <td>{item.Quantity}</td>
                   <td>{item.DemandPastMonth}</td>
                   <td>{item.IndividualWeight_kg.toFixed(2)} kg</td>
-                  <td>{item.TotalWeight_kg.toFixed(2)} kg</td>
+                  <td>₹{item.Price.toFixed(2)}</td>
                   <td>
                     <span className="zone-tag" style={{ backgroundColor: getZoneColor(item.Zone) }}>
                       {item.Zone}
                     </span>
                   </td>
                   <td>{item.ShelfLocation}</td>
-<td>{item.RackLocation}</td>
+                  <td>{item.RackLocation}</td>
                   <td>
                     <div className="status-cell">
                       {item.status === 'Critical' && <FaExclamationTriangle className="warning-icon" />}

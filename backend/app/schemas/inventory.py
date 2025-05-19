@@ -1,24 +1,32 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, validator
 from typing import Optional
 
 class InventoryBase(BaseModel):
-    ProductID: str = Field(..., pattern=r'^P\d{4}$', example="P0001")
+    ProductID: str = Field(
+        ...,
+        min_length=5,
+        max_length=10,
+        pattern=r'^P\d{4,}$',
+        example="P0101",
+        description="Must start with P followed by 4+ digits"
+    )
     ProductName: str = Field(...)
     Category: str = Field(...)
     Quantity: int = Field(..., ge=0, le=10000)
     DemandPastMonth: int = Field(..., ge=0)
     Price: float = Field(..., gt=0, le=1000000)
-    Zone: str = Field(..., pattern=r'^[A-Z]$')
-    ShelfLocation: str = Field(..., pattern=r'^[A-Z]\d+$')
-    RackLocation: Optional[str] = Field(None, pattern=r'^[A-Z]?\d*$')
+    Zone: str = Field(..., max_length=1, pattern=r'^[A-Z]$')
+    ShelfLocation: str = Field(...)
+    RackLocation: Optional[str] = Field(None)
     IndividualWeight_kg: float = Field(..., ge=0)
     TotalWeight_kg: float = Field(..., ge=0)
 
-    @field_validator('TotalWeight_kg')
-    def validate_weight(cls, v, values):
-        if 'IndividualWeight_kg' in values.data and 'Quantity' in values.data:
-            if abs(v - (values.data['IndividualWeight_kg'] * values.data['Quantity'])) > 0.001:
-                raise ValueError("Total weight must equal individual weight × quantity")
+    @validator('TotalWeight_kg')
+    @classmethod
+    def validate_total_weight(cls, v, values):
+        expected = values.get('IndividualWeight_kg', 0) * values.get('Quantity', 0)
+        if abs(v - expected) > 0.001:  # Allow for floating point precision
+            raise ValueError(f"Total weight should be {expected} (IndividualWeight × Quantity)")
         return v
 
     class Config:
@@ -43,8 +51,27 @@ class InventoryCreate(InventoryBase):
     pass
 
 class InventoryUpdate(BaseModel):
-    ProductName: Optional[str] = None
-    Quantity: Optional[int] = None
-    Price: Optional[float] = None
-    ShelfLocation: Optional[str] = None
-    RackLocation: Optional[str] = None
+    ProductName: Optional[str] = Field(None)
+    Quantity: Optional[int] = Field(None)
+    Price: Optional[float] = Field(None, gt=0, le=1000000)
+    ShelfLocation: Optional[str] = Field(None)
+    RackLocation: Optional[str] = Field(None)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "Quantity": 150,
+                "ShelfLocation": "B2"
+            }
+        }
+    }
+
+class RackCapacityBase(BaseModel):
+    id: int
+    zone: str
+    shelf: int
+    rack: int
+    used_weight: float
+
+    class Config:
+        orm_mode = True

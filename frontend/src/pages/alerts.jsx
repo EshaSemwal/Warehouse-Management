@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaBell, 
   FaExclamationTriangle, 
@@ -12,49 +12,38 @@ import {
 import './alerts.css';
 
 const Alerts = () => {
-  // Sample alert data
-  const [alerts, setAlerts] = useState([
-    {
-      id: 1,
-      type: 'low-stock',
-      title: 'Low Stock Alert',
-      item: 'Bearing Assembly (SKU: BRG-2024)',
-      message: 'Only 3 units remaining (min. threshold: 5)',
-      priority: 'critical',
-      timestamp: '2023-06-15 14:30',
-      resolved: false
-    },
-    {
-      id: 2,
-      type: 'overload',
-      title: 'Shelf Overload Warning',
-      item: 'Section A-12 (Capacity: 50kg)',
-      message: 'Current load: 58kg (116% capacity)',
-      priority: 'warning',
-      timestamp: '2023-06-15 13:45',
-      resolved: false
-    },
-    {
-      id: 3,
-      type: 'delay',
-      title: 'Retrieval Delay',
-      item: 'Order #ORD-7842',
-      message: 'Robot navigation delay in Zone 3',
-      priority: 'warning',
-      timestamp: '2023-06-15 11:20',
-      resolved: false
-    },
-    {
-      id: 4,
-      type: 'resolved',
-      title: 'Restock Completed',
-      item: 'Hydraulic Seals (SKU: HS-456)',
-      message: 'Quantity updated from 2 to 25 units',
-      priority: 'info',
-      timestamp: '2023-06-14 16:10',
-      resolved: true
-    }
-  ]);
+  const [alerts, setAlerts] = useState([]);
+  useEffect(() => {
+    fetch('http://localhost:8000/api/inventory/')
+      .then(res => res.json())
+      .then(data => {
+        const generatedAlerts = data.map(item => {
+          if (item.Quantity < 50) {
+            return {
+              id: item.ProductID,
+              type: 'low-stock',
+              title: 'Critical Stock Alert',
+              item: `${item.ProductName} (SKU: ${item.ProductID})`,
+              message: `Only ${item.Quantity} units remaining (critical threshold: 50)`,
+              priority: 'critical',
+              resolved: false
+            };
+          } else if (item.Quantity < 250) {
+            return {
+              id: item.ProductID,
+              type: 'low-stock',
+              title: 'Low Stock Alert',
+              item: `${item.ProductName} (SKU: ${item.ProductID})`,
+              message: `Only ${item.Quantity} units remaining (low stock threshold: 250)`,
+              priority: 'warning',
+              resolved: false
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        setAlerts(generatedAlerts);
+      });
+  }, []);
 
   // Unread alerts count
   const unreadCount = alerts.filter(alert => !alert.resolved).length;

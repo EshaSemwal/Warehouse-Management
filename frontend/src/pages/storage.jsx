@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaBoxOpen, 
   FaRuler, 
@@ -17,73 +17,124 @@ const AddItems = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    dimensions: { length: '', width: '', height: '' },
     weight: '',
-    category: 'Electronics',
+    category: '',
+    newCategory: '',
     quantity: 1,
-    frequency: 'Medium',
-    image: null
+    price: ''
   });
+  const [categories, setCategories] = useState([]);
+  const [showNewCategory, setShowNewCategory] = useState(false);
 
   // Storage simulation
-  const [bins, setBins] = useState([
-    { id: 'bin-1', name: 'Rack A-12', capacity: 80, used: 45, weightLimit: 200, currentWeight: 120 },
-    { id: 'bin-2', name: 'Rack B-05', capacity: 80, used: 30, weightLimit: 150, currentWeight: 90 },
-    { id: 'bin-3', name: 'Rack C-22', capacity: 80, used: 60, weightLimit: 250, currentWeight: 180 },
-    { id: 'bin-4', name: 'Rack D-01', capacity: 80, used: 20, weightLimit: 100, currentWeight: 40 }
-  ]);
+  const [bins, setBins] = useState([]);
+  const [warehouseStats, setWarehouseStats] = useState({
+    totalRacks: 0,
+    racksUsed: 0,
+    totalWeightCapacity: 0,
+    totalUsedWeight: 0,
+    percentRacksUsed: 0
+  });
 
   const [suggestedBins, setSuggestedBins] = useState([]);
   const [draggingItem, setDraggingItem] = useState(null);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/inventory/')
+      .then(res => res.json())
+      .then(data => {
+        const uniqueCategories = Array.from(new Set(data.map(item => item.Category)));
+        setCategories(uniqueCategories);
+      });
+    // Fetch rack capacity for bins and warehouse stats
+    fetch('http://localhost:8000/api/inventory/rack-capacity')
+      .then(res => res.json())
+      .then(data => {
+        setBins(data);
+        // Calculate all zones present
+        const zones = Array.from(new Set(data.map(r => r.zone)));
+        const racksPerZone = 10 * 20; // 10 shelves x 20 racks
+        const totalRacks = zones.length * racksPerZone;
+        // Build a set of used racks (zone-shelf-rack)
+        const usedRackSet = new Set(data.filter(r => r.used_weight > 0).map(r => `${r.zone}-${r.shelf}-${r.rack}`));
+        const racksUsed = usedRackSet.size;
+        const totalWeightCapacity = totalRacks * 100;
+        const totalUsedWeight = data.reduce((sum, r) => sum + r.used_weight, 0);
+        const percentRacksUsed = totalRacks > 0 ? Math.round((racksUsed / totalRacks) * 100) : 0;
+        setWarehouseStats({
+          totalRacks,
+          racksUsed,
+          totalWeightCapacity,
+          totalUsedWeight,
+          percentRacksUsed
+        });
+      });
+  }, []);
 
   // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleDimensionChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      dimensions: { ...prev.dimensions, [name]: value }
-    }));
-  };
-
-  // Handle image upload
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, image: reader.result }));
-      };
-      reader.readAsDataURL(file);
+    if (name === 'category') {
+      setShowNewCategory(value === 'Other');
     }
   };
 
-  // Calculate storage suggestions
-  const calculateSuggestions = () => {
-    // Mock optimization algorithm
-    const suggestions = bins
-      .map(bin => {
-        const availableCapacity = bin.capacity - bin.used;
-        const availableWeight = bin.weightLimit - bin.currentWeight;
-        const score = availableCapacity * 0.7 + availableWeight * 0.3;
-        return { ...bin, score };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2);
-
-    setSuggestedBins(suggestions);
-  };
-
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    calculateSuggestions();
-    // In a real app, you would send data to backend here
-    console.log('Form submitted:', formData);
+    const category = showNewCategory ? formData.newCategory : formData.category;
+    // Compose item data for backend
+    const itemData = {
+      ProductID: `P${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+      ProductName: formData.name,
+      Category: category,
+      Quantity: Number(formData.quantity),
+      DemandPastMonth: 0,
+      Price: Number(formData.price),
+      IndividualWeight_kg: Number(formData.weight),
+      TotalWeight_kg: Number(formData.weight) * Number(formData.quantity)
+    };
+    try {
+      // Try to create new item
+      const res = await fetch('http://localhost:8000/api/inventory/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(itemData)
+      });
+      if (!res.ok) {
+        // If already exists, try to PATCH (update quantity)
+        if (res.status === 422 || res.status === 400) {
+          // Find the product by name in categories (fetch inventory)
+          const invRes = await fetch('http://localhost:8000/api/inventory/');
+          const invData = await invRes.json();
+          const existing = invData.find(i => i.ProductName === formData.name);
+          if (existing) {
+            const patchRes = await fetch(`http://localhost:8000/api/inventory/${existing.ProductID}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ Quantity: existing.Quantity + Number(formData.quantity) })
+            });
+            if (!patchRes.ok) throw new Error('Failed to update item');
+          } else {
+            throw new Error('Failed to add or update item');
+          }
+        } else {
+          throw new Error('Failed to add item');
+        }
+      }
+      // Refresh categories
+      const catRes = await fetch('http://localhost:8000/api/inventory/');
+      const catData = await catRes.json();
+      const uniqueCategories = Array.from(new Set(catData.map(item => item.Category)));
+      setCategories(uniqueCategories);
+      // Reset form
+      setFormData({ name: '', weight: '', category: '', newCategory: '', quantity: 1, price: '' });
+      setShowNewCategory(false);
+      alert('Item added or updated successfully!');
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   // Drag and drop handlers
@@ -124,37 +175,6 @@ const AddItems = () => {
                 required
               />
             </div>
-
-            <div className="form-group">
-              <label><FaRuler /> Dimensions (cm)</label>
-              <div className="dimensions-input">
-                <input
-                  type="number"
-                  name="length"
-                  placeholder="Length"
-                  value={formData.dimensions.length}
-                  onChange={handleDimensionChange}
-                  required
-                />
-                <input
-                  type="number"
-                  name="width"
-                  placeholder="Width"
-                  value={formData.dimensions.width}
-                  onChange={handleDimensionChange}
-                  required
-                />
-                <input
-                  type="number"
-                  name="height"
-                  placeholder="Height"
-                  value={formData.dimensions.height}
-                  onChange={handleDimensionChange}
-                  required
-                />
-              </div>
-            </div>
-
             <div className="form-group">
               <label><FaWeightHanging /> Weight (kg)</label>
               <input
@@ -165,21 +185,31 @@ const AddItems = () => {
                 required
               />
             </div>
-
             <div className="form-group">
               <label><FaBoxes /> Category</label>
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
+                required
               >
-                <option value="Electronics">Electronics</option>
-                <option value="Tools">Tools</option>
-                <option value="Packages">Packages</option>
-                <option value="Machinery">Machinery</option>
+                <option value="">Select Category</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="Other">Other</option>
               </select>
+              {showNewCategory && (
+                <input
+                  type="text"
+                  name="newCategory"
+                  placeholder="Enter new category"
+                  value={formData.newCategory}
+                  onChange={handleChange}
+                  required
+                />
+              )}
             </div>
-
             <div className="form-group">
               <label>Quantity</label>
               <input
@@ -191,41 +221,20 @@ const AddItems = () => {
                 required
               />
             </div>
-
             <div className="form-group">
-              <label><FaSortAmountDownAlt /> Retrieval Frequency</label>
-              <select
-                name="frequency"
-                value={formData.frequency}
+              <label>Price</label>
+              <input
+                type="number"
+                name="price"
+                min="0.01"
+                step="0.01"
+                value={formData.price}
                 onChange={handleChange}
-              >
-                <option value="High">High (Frequent access)</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low (Rarely accessed)</option>
-              </select>
+                required
+              />
             </div>
-
-            <div className="form-group">
-              <label><FaCamera /> Item Image</label>
-              <div className="image-upload">
-                <input
-                  type="file"
-                  id="item-image"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  style={{ display: 'none' }}
-                />
-                <label htmlFor="item-image" className="upload-btn">
-                  Choose File
-                </label>
-                {formData.image && (
-                  <img src={formData.image} alt="Preview" className="image-preview" />
-                )}
-              </div>
-            </div>
-
             <button type="submit" className="submit-btn">
-              Calculate Optimal Storage
+              Add Item
             </button>
           </form>
         </section>
@@ -256,59 +265,30 @@ const AddItems = () => {
             </div>
           )}
 
-          {/* Bin Visualization */}
+          {/* Dynamic Storage Bins */}
           <div className="bin-visualization">
-            <h3><FaWarehouse /> Storage Bins</h3>
-            <p>Drag to rearrange by priority</p>
-            
-            <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-              <Droppable droppableId="bins">
-                {(provided) => (
-                  <div 
-                    {...provided.droppableProps} 
-                    ref={provided.innerRef}
-                    className="bins-container"
-                  >
-                    {bins.map((bin, index) => (
-                      <Draggable key={bin.id} draggableId={bin.id} index={index}>
-                        {(provided) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className={`bin-card ${draggingItem === bin.id ? 'dragging' : ''}`}
-                          >
-                            <div className="bin-header">
-                              <h4>{bin.name}</h4>
-                              <div className="bin-status">
-                                <span className={`capacity ${bin.used > 70 ? 'warning' : ''}`}>
-                                  {bin.used}% full
-                                </span>
-                                <span className="weight">
-                                  {bin.currentWeight}/{bin.weightLimit}kg
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bin-visual">
-                              <div 
-                                className="bin-used-space" 
-                                style={{ height: `${bin.used}%` }}
-                              ></div>
-                            </div>
-                            <div className="bin-footer">
-                              <div className="bin-dimensions">
-                                <span>120cm × 80cm × 200cm</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
+            <h3><FaWarehouse /> Storage Racks</h3>
+            <p>Each rack shows % emptiness and its capacity</p>
+            <div className="bins-container">
+              {bins.filter(bin => bin.used_weight < 99.99).map((bin) => {
+                const percentEmpty = 100 - Math.round((bin.used_weight / 100) * 100);
+                return (
+                  <div key={bin.id} className="bin-card">
+                    <div className="bin-header">
+                      <h4>{bin.zone}{bin.shelf}-{bin.rack}</h4>
+                      <div className="bin-status">
+                        <span className={`capacity ${percentEmpty < 30 ? 'warning' : ''}`}>
+                          {percentEmpty}% empty
+                        </span>
+                        <span className="weight">
+                          {bin.used_weight.toFixed(1)}/100kg
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </Droppable>
-            </DragDropContext>
+                );
+              })}
+            </div>
           </div>
 
           {/* Warehouse Stats */}
@@ -316,16 +296,16 @@ const AddItems = () => {
             <h3><FaChartPie /> Warehouse Capacity</h3>
             <div className="stats-grid">
               <div className="stat-item">
-                <div className="stat-value">65%</div>
+                <div className="stat-value">{warehouseStats.percentRacksUsed}%</div>
                 <div className="stat-label">Total Space Used</div>
               </div>
               <div className="stat-item">
-                <div className="stat-value">32/50</div>
-                <div className="stat-label">Shelves Available</div>
+                <div className="stat-value">{warehouseStats.racksUsed}/{warehouseStats.totalRacks}</div>
+                <div className="stat-label">Racks Used</div>
               </div>
               <div className="stat-item">
-                <div className="stat-value">1.2T/5T</div>
-                <div className="stat-label">Weight Capacity</div>
+                <div className="stat-value">{(warehouseStats.totalUsedWeight/1000).toFixed(2)}T/{(warehouseStats.totalWeightCapacity/1000).toFixed(2)}T</div>
+                <div className="stat-label">Weight Capacity Used</div>
               </div>
             </div>
           </div>

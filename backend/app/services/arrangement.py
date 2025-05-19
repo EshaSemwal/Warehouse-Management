@@ -23,52 +23,67 @@ class WarehouseArranger:
     @staticmethod
     def rearrange_inventory(db: Session):
         db.execute(text("TRUNCATE TABLE rack_capacity"))
-        items = db.query(ProductInventory).order_by(ProductInventory.DemandPastMonth.desc()).all()
+        db.commit()
+        # Get all products
+        items = db.query(ProductInventory).all()
+        # Group by zone
+        zone_map = WarehouseArranger.ZONE_MAPPING
+        # Build zone->products dict
+        zone_products = {}
         for item in items:
-            if not item.TotalWeight_kg:
-                item.TotalWeight_kg = item.IndividualWeight_kg * item.Quantity
-            item.Zone = WarehouseArranger.get_zone(item.Category)
-            remaining_quantity = item.Quantity
-            current_shelf = 1
-            current_rack = 1
-            shelf_numbers = []
-            rack_numbers = []
-            while remaining_quantity > 0:
-                rack = db.execute(
-                    f"SELECT used_weight FROM rack_capacity WHERE zone = '{item.Zone}' AND shelf = '{current_shelf}' AND rack = '{current_rack}'"
-                ).fetchone()
-                available_capacity = 100 - (rack.used_weight if rack else 0)
-                if available_capacity <= 0:
-                    current_rack += 1
-                    if current_rack > 10:
-                        current_shelf += 1
-                        current_rack = 1
+            zone = zone_map.get(item.Category.lower(), 'Z')
+            if zone not in zone_products:
+                zone_products[zone] = []
+            zone_products[zone].append(item)
+        # For each zone
+        for zone, products in zone_products.items():
+            products.sort(key=lambda p: p.DemandPastMonth, reverse=True)
+            max_shelves = 20
+            max_racks = 10
+            rack_capacity = 100.0
+            for product in products:
+                if product.Quantity <= 0:
                     continue
-                weight_to_place = min(
-                    remaining_quantity * item.IndividualWeight_kg,
-                    available_capacity
-                )
-                quantity_to_place = int(weight_to_place / item.IndividualWeight_kg)
-                if quantity_to_place == 0 and remaining_quantity > 0:
-                    quantity_to_place = 1
-                if rack:
-                    db.execute(
-                        f"UPDATE rack_capacity SET used_weight = used_weight + {quantity_to_place * item.IndividualWeight_kg} "
-                        f"WHERE zone = '{item.Zone}' AND shelf = '{current_shelf}' AND rack = '{current_rack}'"
-                    )
-                else:
-                    db.execute(
-                        f"INSERT INTO rack_capacity (zone, shelf, rack, used_weight) "
-                        f"VALUES ('{item.Zone}', '{current_shelf}', '{current_rack}', {quantity_to_place * item.IndividualWeight_kg})"
-                    )
-                # Only append the numbers, not the zone
-                shelf_numbers.append(str(current_shelf))
-                rack_numbers.append(str(current_rack))
-                remaining_quantity -= quantity_to_place
-                current_rack += 1
-                if current_rack > 10:
-                    current_shelf += 1
-                    current_rack = 1
-            item.ShelfLocation = ",".join(shelf_numbers)
-            item.RackLocation = ",".join(rack_numbers)
+                product_weight = product.IndividualWeight_kg
+                if product_weight <= 0:
+                    continue
+                remaining_quantity = product.Quantity
+                shelf_numbers = []
+                rack_numbers = []
+                # Fill all racks of shelf 1, then shelf 2, etc.
+                for shelf_num in range(1, max_shelves+1):
+                    for rack_num in range(1, max_racks+1):
+                        if remaining_quantity <= 0:
+                            break
+                        used_weight = db.execute(text(
+                            "SELECT used_weight FROM rack_capacity WHERE zone = :zone AND shelf = :shelf AND rack = :rack"
+                        ), {'zone': zone, 'shelf': shelf_num, 'rack': rack_num}).fetchone()
+                        current_weight = used_weight[0] if used_weight else 0.0
+                        available_capacity = rack_capacity - current_weight
+                        max_units = int(available_capacity // product_weight)
+                        if max_units <= 0:
+                            continue
+                        units_to_place = min(max_units, remaining_quantity)
+                        if units_to_place <= 0:
+                            continue
+                        weight_to_place = units_to_place * product_weight
+                        # Update rack_capacity
+                        if used_weight:
+                            db.execute(text(
+                                "UPDATE rack_capacity SET used_weight = used_weight + :used_weight WHERE zone = :zone AND shelf = :shelf AND rack = :rack"
+                            ), {'used_weight': weight_to_place, 'zone': zone, 'shelf': shelf_num, 'rack': rack_num})
+                        else:
+                            db.execute(text(
+                                "INSERT INTO rack_capacity (zone, shelf, rack, used_weight) VALUES (:zone, :shelf, :rack, :used_weight)"
+                            ), {'zone': zone, 'shelf': shelf_num, 'rack': rack_num, 'used_weight': weight_to_place})
+                        # Record shelf and rack
+                        shelf_numbers.append(f"{zone}{shelf_num}")
+                        rack_numbers.append(str(rack_num))
+                        remaining_quantity -= units_to_place
+                    if remaining_quantity <= 0:
+                        break
+                # Set all locations as comma-separated
+                product.Zone = zone
+                product.ShelfLocation = ','.join(shelf_numbers)
+                product.RackLocation = ','.join(rack_numbers)
         db.commit()
