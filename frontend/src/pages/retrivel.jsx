@@ -21,39 +21,44 @@ const Retrieval = () => {
     e.preventDefault();
     setIsRetrieving(true);
     try {
-      // Try by ProductID first
-      let response = await fetch(`http://localhost:8000/api/inventory/retrieve/${formData.itemId}?quantity=${formData.quantity}`, {
+      // Fetch inventory to find item by ID or name
+      const invRes = await fetch('http://localhost:8000/api/inventory/');
+      const invData = await invRes.json();
+      const found = invData.find(i =>
+        i.ProductID.toLowerCase() === formData.itemId.toLowerCase() ||
+        i.ProductName.toLowerCase() === formData.itemId.toLowerCase()
+      );
+      if (!found) {
+        message.error('Item not available.');
+        setIsRetrieving(false);
+        return;
+      }
+      const reqQty = Number(formData.quantity);
+      if (reqQty > found.Quantity) {
+        message.error(`Retrieval quantity exceeds available quantity. Maximum retrievable: ${found.Quantity}`);
+        setIsRetrieving(false);
+        return;
+      }
+      // Update item: reduce quantity, increase demand
+      const updated = {
+        Quantity: found.Quantity - reqQty,
+        DemandPastMonth: (found.DemandPastMonth || 0) + reqQty
+      };
+      const patchRes = await fetch(`http://localhost:8000/api/inventory/${found.ProductID}`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
       });
-      if (response.ok) {
+      if (patchRes.ok) {
         message.success('Item retrieved and demand updated!');
+        setFormData({ itemId: '', quantity: 1, scanMode: false });
       } else {
-        // If not found by ID, try by name
-        const invRes = await fetch('http://localhost:8000/api/inventory/');
-        const invData = await invRes.json();
-        const found = invData.find(i => i.ProductName.toLowerCase() === formData.itemId.toLowerCase());
-        if (!found) {
-          message.error('Product not found.');
-        } else if (found.Quantity < Number(formData.quantity)) {
-          message.error(`Requested quantity exceeds available stock. Maximum available: ${found.Quantity}`);
-        } else {
-          // Try retrieval by found ProductID
-          response = await fetch(`http://localhost:8000/api/inventory/retrieve/${found.ProductID}?quantity=${formData.quantity}`, {
-            method: 'PATCH',
-          });
-          if (response.ok) {
-            message.success('Item retrieved and demand updated!');
-          } else {
-            message.error('Failed to retrieve item.');
-          }
-        }
+        message.error('Failed to retrieve item.');
       }
     } catch (err) {
       message.error('Error retrieving item.');
-    } finally {
-      setIsRetrieving(false);
-      setFormData({ itemId: '', quantity: 1, scanMode: false });
     }
+    setIsRetrieving(false);
   };
 
   return (

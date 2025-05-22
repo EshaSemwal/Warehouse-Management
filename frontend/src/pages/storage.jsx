@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fa';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import './storage.css';
+import { message } from 'antd';
 
 const AddItems = () => {
   // Form state
@@ -33,11 +34,46 @@ const AddItems = () => {
     racksUsed: 0,
     totalWeightCapacity: 0,
     totalUsedWeight: 0,
-    percentRacksUsed: 0
+    percentRacksUsed: 0,
+    percentSpaceUsed: 0
   });
 
   const [suggestedBins, setSuggestedBins] = useState([]);
   const [draggingItem, setDraggingItem] = useState(null);
+  const [isAdding, setIsAdding] = useState(false);
+
+  // Helper to fetch bins and update stats
+  const fetchBinsAndStats = async () => {
+    const binsRes = await fetch('http://localhost:8000/api/inventory/rack-capacity');
+    const binsData = await binsRes.json();
+    setBins(binsData);
+    // Calculate stats immediately after fetching
+    if (binsData.length === 0) {
+      setWarehouseStats({
+        totalRacks: 0,
+        racksUsed: 0,
+        totalWeightCapacity: 0,
+        totalUsedWeight: 0,
+        percentRacksUsed: 0,
+        percentSpaceUsed: 0
+      });
+      return;
+    }
+    const totalRacks = binsData.length;
+    const racksUsed = binsData.filter(r => r.used_weight > 0).length;
+    const totalWeightCapacity = totalRacks * 100;
+    const totalUsedWeight = binsData.reduce((sum, r) => sum + r.used_weight, 0);
+    const percentSpaceUsed = totalWeightCapacity > 0 ? Math.round((totalUsedWeight / totalWeightCapacity) * 100) : 0;
+    const percentRacksUsed = totalRacks > 0 ? Math.round((racksUsed / totalRacks) * 100) : 0;
+    setWarehouseStats({
+      totalRacks,
+      racksUsed,
+      totalWeightCapacity,
+      totalUsedWeight,
+      percentRacksUsed,
+      percentSpaceUsed
+    });
+  };
 
   useEffect(() => {
     fetch('http://localhost:8000/api/inventory/')
@@ -46,29 +82,7 @@ const AddItems = () => {
         const uniqueCategories = Array.from(new Set(data.map(item => item.Category)));
         setCategories(uniqueCategories);
       });
-    // Fetch rack capacity for bins and warehouse stats
-    fetch('http://localhost:8000/api/inventory/rack-capacity')
-      .then(res => res.json())
-      .then(data => {
-        setBins(data);
-        // Calculate all zones present
-        const zones = Array.from(new Set(data.map(r => r.zone)));
-        const racksPerZone = 10 * 20; // 10 shelves x 20 racks
-        const totalRacks = zones.length * racksPerZone;
-        // Build a set of used racks (zone-shelf-rack)
-        const usedRackSet = new Set(data.filter(r => r.used_weight > 0).map(r => `${r.zone}-${r.shelf}-${r.rack}`));
-        const racksUsed = usedRackSet.size;
-        const totalWeightCapacity = totalRacks * 100;
-        const totalUsedWeight = data.reduce((sum, r) => sum + r.used_weight, 0);
-        const percentRacksUsed = totalRacks > 0 ? Math.round((racksUsed / totalRacks) * 100) : 0;
-        setWarehouseStats({
-          totalRacks,
-          racksUsed,
-          totalWeightCapacity,
-          totalUsedWeight,
-          percentRacksUsed
-        });
-      });
+    fetchBinsAndStats();
   }, []);
 
   // Handle form input changes
@@ -80,11 +94,11 @@ const AddItems = () => {
     }
   };
 
-  // Handle form submission
+  // On add/update, always re-fetch bins and stats
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsAdding(true);
     const category = showNewCategory ? formData.newCategory : formData.category;
-    // Compose item data for backend
     const itemData = {
       ProductID: `P${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
       ProductName: formData.name,
@@ -96,16 +110,13 @@ const AddItems = () => {
       TotalWeight_kg: Number(formData.weight) * Number(formData.quantity)
     };
     try {
-      // Try to create new item
       const res = await fetch('http://localhost:8000/api/inventory/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(itemData)
       });
       if (!res.ok) {
-        // If already exists, try to PATCH (update quantity)
         if (res.status === 422 || res.status === 400) {
-          // Find the product by name in categories (fetch inventory)
           const invRes = await fetch('http://localhost:8000/api/inventory/');
           const invData = await invRes.json();
           const existing = invData.find(i => i.ProductName === formData.name);
@@ -128,13 +139,14 @@ const AddItems = () => {
       const catData = await catRes.json();
       const uniqueCategories = Array.from(new Set(catData.map(item => item.Category)));
       setCategories(uniqueCategories);
-      // Reset form
+      // Always re-fetch bins and stats after add/update
+      await fetchBinsAndStats();
       setFormData({ name: '', weight: '', category: '', newCategory: '', quantity: 1, price: '' });
       setShowNewCategory(false);
-      alert('Item added or updated successfully!');
     } catch (err) {
-      alert(err.message);
+      message.error(err.message);
     }
+    setTimeout(() => setIsAdding(false), 2000);
   };
 
   // Drag and drop handlers
@@ -233,8 +245,8 @@ const AddItems = () => {
                 required
               />
             </div>
-            <button type="submit" className="submit-btn">
-              Add Item
+            <button type="submit" className={`submit-btn${isAdding ? ' loading' : ''}`} disabled={isAdding}>
+              {isAdding ? 'Adding item...' : 'Add Item'}
             </button>
           </form>
         </section>
@@ -270,24 +282,57 @@ const AddItems = () => {
             <h3><FaWarehouse /> Storage Racks</h3>
             <p>Each rack shows % emptiness and its capacity</p>
             <div className="bins-container">
-              {bins.filter(bin => bin.used_weight < 99.99).map((bin) => {
-                const percentEmpty = 100 - Math.round((bin.used_weight / 100) * 100);
-                return (
-                  <div key={bin.id} className="bin-card">
-                    <div className="bin-header">
-                      <h4>{bin.zone}{bin.shelf}-{bin.rack}</h4>
-                      <div className="bin-status">
-                        <span className={`capacity ${percentEmpty < 30 ? 'warning' : ''}`}>
-                          {percentEmpty}% empty
-                        </span>
-                        <span className="weight">
-                          {bin.used_weight.toFixed(1)}/100kg
-                        </span>
+              {bins.length === 0 ? (
+                <div style={{ color: '#888', textAlign: 'center', padding: '1rem' }}>
+                  No racks available.
+                </div>
+              ) : (() => {
+                // Separate bins by type
+                const emptyBins = bins.filter(bin => bin.used_weight === 0);
+                const filledBins = bins.filter(bin => bin.used_weight >= 99.99);
+                const partialBins = bins.filter(bin => bin.used_weight > 0 && bin.used_weight < 99.99);
+
+                // Helper to get random items from an array
+                function getRandomItems(arr, count) {
+                  const shuffled = arr.slice().sort(() => 0.5 - Math.random());
+                  return shuffled.slice(0, count);
+                }
+
+                let selected = [];
+                // Try to include at least one of each type if available
+                if (emptyBins.length > 0) selected.push(getRandomItems(emptyBins, 1)[0]);
+                if (partialBins.length > 0) selected.push(getRandomItems(partialBins, 1)[0]);
+                if (filledBins.length > 0) selected.push(getRandomItems(filledBins, 1)[0]);
+
+                // Fill the rest up to 10 with random bins from all bins, excluding already selected
+                const alreadySelectedIds = new Set(selected.filter(Boolean).map(b => b.id));
+                const remainingBins = bins.filter(b => !alreadySelectedIds.has(b.id));
+                const needed = 10 - selected.length;
+                selected = selected.filter(Boolean).concat(getRandomItems(remainingBins, needed));
+
+                // Shuffle final selection for randomness
+                selected = selected.sort(() => 0.5 - Math.random());
+
+                // Only show up to 10
+                return selected.slice(0, 10).map((bin) => {
+                  const percentEmpty = 100 - Math.round((bin.used_weight / 100) * 100);
+                  return (
+                    <div key={bin.id} className="bin-card">
+                      <div className="bin-header">
+                        <h4>{bin.zone}{bin.shelf}-{bin.rack}</h4>
+                        <div className="bin-status">
+                          <span className={`capacity ${percentEmpty < 30 ? 'warning' : ''}`}>
+                            {percentEmpty}% empty
+                          </span>
+                          <span className="weight">
+                            {bin.used_weight.toFixed(1)}/100kg
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -296,7 +341,7 @@ const AddItems = () => {
             <h3><FaChartPie /> Warehouse Capacity</h3>
             <div className="stats-grid">
               <div className="stat-item">
-                <div className="stat-value">{warehouseStats.percentRacksUsed}%</div>
+                <div className="stat-value">{warehouseStats.percentSpaceUsed || 0}%</div>
                 <div className="stat-label">Total Space Used</div>
               </div>
               <div className="stat-item">
@@ -308,6 +353,11 @@ const AddItems = () => {
                 <div className="stat-label">Weight Capacity Used</div>
               </div>
             </div>
+            {bins.length > 0 && bins.every(b => b.used_weight === 0) && (
+              <div style={{color:'#888',textAlign:'center',marginTop:'1rem'}}>
+                No racks are currently filled. Add products to see warehouse usage.
+              </div>
+            )}
           </div>
         </section>
       </div>

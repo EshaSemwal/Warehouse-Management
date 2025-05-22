@@ -92,13 +92,40 @@ def retrieve_item(product_id: str, quantity: int, db: Session = Depends(get_db))
 
 @router.get("/rack-capacity", response_model=List[RackCapacityBase])
 def get_rack_capacity(db: Session = Depends(get_db)):
+    # Get all existing racks from the table
     result = db.execute(text("SELECT id, zone, shelf, rack, used_weight FROM rack_capacity")).fetchall()
-    return [
-        RackCapacityBase(
-            id=row[0],
-            zone=row[1],
-            shelf=row[2],
-            rack=row[3],
-            used_weight=row[4]
-        ) for row in result
-    ]
+    existing = {(row[1], row[2], row[3]): (row[0], row[4]) for row in result}
+
+    # All possible zones (from ZONE_MAPPING)
+    all_zones = ['A', 'B', 'C', 'D', 'F', 'G', 'H', 'I', 'J', 'Z']
+    all_shelves = range(1, 21)
+    all_racks = range(1, 11)
+    racks = []
+    next_id = max([row[0] for row in result], default=0) + 1
+    for zone in all_zones:
+        for shelf in all_shelves:
+            for rack in all_racks:
+                key = (zone, shelf, rack)
+                if key in existing:
+                    racks.append(RackCapacityBase(
+                        id=existing[key][0],
+                        zone=zone,
+                        shelf=shelf,
+                        rack=rack,
+                        used_weight=existing[key][1]
+                    ))
+                else:
+                    racks.append(RackCapacityBase(
+                        id=next_id,
+                        zone=zone,
+                        shelf=shelf,
+                        rack=rack,
+                        used_weight=0.0
+                    ))
+                    next_id += 1
+    return racks
+
+@router.get("/debug/rack-contents")
+def debug_rack_contents(db: Session = Depends(get_db)):
+    result = db.execute(text("SELECT * FROM rack_capacity LIMIT 20")).fetchall()
+    return [dict(row) for row in result]
