@@ -57,7 +57,7 @@ const Alerts = () => {
 
   const handleRestock = (id) => {
     // In a real app, this would trigger a restock process
-    alert(`Restock initiated for alert #${id}`);
+    alert(`Restock initiated for alert #${id} `);
     handleResolve(id);
   };
 
