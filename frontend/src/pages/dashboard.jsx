@@ -11,6 +11,7 @@ import {
 import './dashboard.css';
 import warehouseImage from '../components/Assets/warehouse-hero.webp'; // Replace with your image path
 import analyticsImage from '../components/Assets/Analytics.webp'; // Replace with your image path
+import Footer from '../components/Footer/Footer';
 
 const Dashboard = () => {
   // Sample metrics data
@@ -134,6 +135,9 @@ const Dashboard = () => {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
