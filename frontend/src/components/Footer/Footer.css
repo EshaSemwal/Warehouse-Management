@@ -3,6 +3,7 @@
   color: #fff;
   padding: 4rem 0 0;
   margin-top: 4rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .footer-content {
@@ -31,6 +32,7 @@
 .logo-icon {
   font-size: 2rem;
   color: #4a6bff;
+  filter: drop-shadow(0 0 5px rgba(74, 107, 255, 0.5));
 }
 
 .footer-description {
@@ -47,11 +49,20 @@
 .social-link {
   color: #fff;
   font-size: 1.2rem;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .social-link:hover {
   color: #4a6bff;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
 .footer-section h3 {
@@ -59,26 +70,58 @@
   font-weight: 600;
   margin-bottom: 0.5rem;
   color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.footer-links {
+.section-icon {
+  color: #4a6bff;
+  font-size: 1.1rem;
+}
+
+.footer-links, .team-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.footer-links li {
+.footer-links li, .team-list li {
   margin-bottom: 0.8rem;
 }
 
-.footer-links a {
+.footer-links a, .team-list a {
   color: #a0aec0;
   text-decoration: none;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
+  display: inline-block;
 }
 
-.footer-links a:hover {
+.footer-links a:hover, .team-list a:hover {
   color: #4a6bff;
+  transform: translateX(5px);
+}
+
+.github-repo {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #a0aec0;
+}
+
+.github-repo a {
+  color: #4a6bff;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.github-repo a:hover {
+  text-decoration: underline;
+}
+
+.github-icon {
+  font-size: 1.2rem;
 }
 
 .contact-info {
@@ -89,29 +132,39 @@
 
 .contact-info li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1rem;
   color: #a0aec0;
+  line-height: 1.5;
 }
 
 .contact-icon {
   color: #4a6bff;
   font-size: 1.2rem;
+  margin-top: 0.2rem;
 }
 
 .newsletter-form {
   display: flex;
   gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .newsletter-form input {
   flex: 1;
   padding: 0.8rem;
   border: 1px solid #4a5568;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #2d3748;
   color: #fff;
+  transition: all 0.3s ease;
+}
+
+.newsletter-form input:focus {
+  outline: none;
+  border-color: #4a6bff;
+  box-shadow: 0 0 0 2px rgba(74, 107, 255, 0.2);
 }
 
 .newsletter-form input::placeholder {
@@ -123,21 +176,22 @@
   background: #4a6bff;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  font-weight: 500;
 }
 
 .newsletter-form button:hover {
   background: #3b5bdb;
+  transform: translateY(-1px);
 }
 
 .footer-bottom {
   max-width: 1400px;
-  margin: 0 auto;
+  margin: 4rem auto 0;
   padding: 2rem;
-  margin-top: 4rem;
-  border-top: 1px solid #4a5568;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -148,18 +202,20 @@
 .footer-bottom p {
   color: #a0aec0;
   font-size: 0.9rem;
+  margin: 0;
 }
 
 .footer-bottom-links {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .footer-bottom-links a {
   color: #a0aec0;
   text-decoration: none;
   font-size: 0.9rem;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .footer-bottom-links a:hover {
@@ -175,10 +231,12 @@
   .footer-bottom {
     flex-direction: column;
     text-align: center;
+    padding: 1.5rem;
   }
 
   .footer-bottom-links {
     justify-content: center;
+    margin-top: 1rem;
   }
 
   .newsletter-form {
@@ -188,4 +246,15 @@
   .newsletter-form button {
     width: 100%;
   }
-} 
+}
+
+/* Animation for hover effects */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.social-link:hover {
+  animation: pulse 0.5s ease;
+}

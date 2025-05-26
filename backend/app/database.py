@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import urllib.parse
 
-password = "Esha@1215"
+password = "pranav1234"
 encoded_password = urllib.parse.quote_plus(password)
 
 SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://root:{encoded_password}@localhost:3306/warehouse"

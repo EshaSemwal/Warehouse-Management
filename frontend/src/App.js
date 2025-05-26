@@ -8,6 +8,7 @@ import Retrieval from './pages/retrivel';
 import Alerts from './pages/alerts';
 import Analytics from './pages/analytics';
 import Settings from './pages/settings';
+import AboutUs from './pages/Aboutus';
 import Login from './pages/login';
 import Signup from './pages/signup';
 import ProductList from "./components/ProductList";
@@ -43,6 +44,9 @@ function App() {
             
             {/* Settings */}
             <Route path="/settings" element={<Settings />} />
+
+             {/* AboutUs */}
+            <Route path="/Aboutus" element={<AboutUs />} />
             
             {/* Authentication */}
             <Route path="/login" element={<Login />} />

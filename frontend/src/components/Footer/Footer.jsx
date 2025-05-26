@@ -96,7 +96,7 @@ const Footer = () => {
             </li>
             <li>
               <FaMapMarkerAlt className="contact-icon" />
-              <span>123 Warehouse Ave, Industrial Park, CA 90210</span>
+              <span>Clement Town , Dehradun</span>
             </li>
           </ul>
         </div>
@@ -112,9 +112,9 @@ const Footer = () => {
       </div>
 
       <div className="footer-bottom">
-        <p>&copy; 2024 SmartWMS. All rights reserved.</p>
+        <p>&copy; 2025 SmartWMS. All rights reserved.</p>
         <div className="footer-bottom-links">
-          <a href="#">Privacy Policy</a>
+          <a href="frontend\src\pages\Aboutus.jsx">Meet Developers </a>
           <a href="#">Terms of Service</a>
           <a href="#">Cookie Policy</a>
         </div>

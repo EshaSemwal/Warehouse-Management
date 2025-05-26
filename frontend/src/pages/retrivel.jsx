@@ -4,14 +4,13 @@ import './retrivel.css';
 import { message, Card, Radio, Button, Steps, Alert, Table, AutoComplete, Spin } from 'antd';
 
 const Retrieval = () => {
-  // Form state
   const [formData, setFormData] = useState({
     itemId: '',
     quantity: 1,
     scanMode: false
   });
-
   const [isRetrieving, setIsRetrieving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [currentStep, setCurrentStep] = useState(0);
@@ -21,20 +20,23 @@ const Retrieval = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Fetch all products on component mount
   useEffect(() => {
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
+    setIsLoading(true);
     try {
       const response = await fetch('http://localhost:8000/api/inventory/');
+      if (!response.ok) throw new Error('Network error while fetching products');
       const data = await response.json();
       setAllProducts(data);
       updateProductOptions(data);
     } catch (err) {
       console.error('Error fetching products:', err);
-      message.error('Failed to load products');
+      message.error(`Failed to load products: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,8 +63,7 @@ const Retrieval = () => {
       updateProductOptions(allProducts);
       return;
     }
-
-    const filteredProducts = allProducts.filter(product => 
+    const filteredProducts = allProducts.filter(product =>
       product.ProductName.toLowerCase().includes(value.toLowerCase()) ||
       product.ProductID.toLowerCase().includes(value.toLowerCase())
     );
@@ -70,10 +71,7 @@ const Retrieval = () => {
   };
 
   const handleSelect = (value, option) => {
-    setFormData(prev => ({
-      ...prev,
-      itemId: option.key // Set the ProductID as the itemId
-    }));
+    setFormData(prev => ({ ...prev, itemId: option.key }));
   };
 
   const handleScanToggle = () => {
@@ -83,26 +81,17 @@ const Retrieval = () => {
 
   const validateQuantity = (quantity, availableQuantity) => {
     if (quantity <= 0) {
-      return {
-        valid: false,
-        message: 'Quantity must be greater than 0'
-      };
+      return { valid: false, message: 'Quantity must be greater than 0' };
     }
     if (quantity > availableQuantity) {
-      return {
-        valid: false,
-        message: `Only ${availableQuantity} units available in stock`
-      };
+      return { valid: false, message: `Only ${availableQuantity} units available in stock` };
     }
     return { valid: true };
   };
 
   const validateItemId = (itemId) => {
     if (!itemId.trim()) {
-      return {
-        valid: false,
-        message: 'Please enter a product ID or name'
-      };
+      return { valid: false, message: 'Please enter a product ID or name' };
     }
     return { valid: true };
   };
@@ -112,9 +101,8 @@ const Retrieval = () => {
     setIsRetrieving(true);
     setQuantityError(null);
     setItemError(null);
-    
+
     try {
-      // Validate item ID first
       const itemValidation = validateItemId(formData.itemId);
       if (!itemValidation.valid) {
         setItemError(itemValidation.message);
@@ -122,9 +110,7 @@ const Retrieval = () => {
         return;
       }
 
-      // Find product in our local state
       const found = allProducts.find(p => p.ProductID === formData.itemId);
-      
       if (!found) {
         setItemError('Product not found. Please check the ID or name and try again.');
         setIsRetrieving(false);
@@ -133,25 +119,21 @@ const Retrieval = () => {
 
       const reqQty = Number(formData.quantity);
       const quantityValidation = validateQuantity(reqQty, found.Quantity);
-      
       if (!quantityValidation.valid) {
         setQuantityError(quantityValidation.message);
         setIsRetrieving(false);
         return;
       }
 
-      // Check if product already exists in cart
       const existingProductIndex = selectedProducts.findIndex(p => p.ProductID === found.ProductID);
       if (existingProductIndex !== -1) {
         const updatedProducts = [...selectedProducts];
         const newQuantity = updatedProducts[existingProductIndex].retrievedQuantity + reqQty;
-        
         if (newQuantity > found.Quantity) {
           setQuantityError(`Total quantity (${newQuantity}) exceeds available stock (${found.Quantity})`);
           setIsRetrieving(false);
           return;
         }
-        
         updatedProducts[existingProductIndex].retrievedQuantity = newQuantity;
         updatedProducts[existingProductIndex].totalPrice = found.Price * newQuantity;
         setSelectedProducts(updatedProducts);
@@ -166,14 +148,17 @@ const Retrieval = () => {
       message.success('Product added to cart!');
       setFormData({ itemId: '', quantity: 1, scanMode: false });
     } catch (err) {
-      message.error('Error adding product to cart.');
+      message.error(`Error adding product to cart: ${err.message}`);
     }
     setIsRetrieving(false);
   };
 
   const handleRemoveFromCart = (productId) => {
-    setSelectedProducts(selectedProducts.filter(p => p.ProductID !== productId));
-    message.success('Product removed from cart');
+    const product = selectedProducts.find(p => p.ProductID === productId);
+    if (window.confirm(`Remove ${product?.ProductName} from cart?`)) {
+      setSelectedProducts(selectedProducts.filter(p => p.ProductID !== productId));
+      message.success('Product removed from cart');
+    }
   };
 
   const handleUpdateQuantity = (productId, newQuantity) => {
@@ -186,8 +171,8 @@ const Retrieval = () => {
       return;
     }
 
-    setSelectedProducts(selectedProducts.map(p => 
-      p.ProductID === productId 
+    setSelectedProducts(selectedProducts.map(p =>
+      p.ProductID === productId
         ? { ...p, retrievedQuantity: newQuantity, totalPrice: p.Price * newQuantity }
         : p
     ));
@@ -204,34 +189,26 @@ const Retrieval = () => {
   const handlePayment = async () => {
     setIsProcessingPayment(true);
     try {
-      // Update inventory for all products
       for (const product of selectedProducts) {
         const updated = {
           Quantity: product.Quantity - product.retrievedQuantity,
           DemandPastMonth: (product.DemandPastMonth || 0) + product.retrievedQuantity
         };
-        
         const response = await fetch(`http://localhost:8000/api/inventory/${product.ProductID}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updated)
         });
-
         if (!response.ok) {
           throw new Error(`Failed to update inventory for product ${product.ProductID}`);
         }
       }
 
-      // Simulate payment processing
       message.loading('Processing payment...', 1.5);
-      
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       setCurrentStep(2);
       message.success('Payment successful!');
-      
-      // Clear cart and reset after 2 seconds
       setTimeout(() => {
         setSelectedProducts([]);
         setCurrentStep(0);
@@ -239,19 +216,17 @@ const Retrieval = () => {
         setIsProcessingPayment(false);
       }, 2000);
     } catch (err) {
-      message.error('Error processing payment. Please try again.');
+      message.error(`Error processing payment: ${err.message}`);
       console.error('Payment error:', err);
       setIsProcessingPayment(false);
     }
   };
 
   const handleStepChange = (step) => {
-    // Prevent going back to select items if payment has started
     if (step === 0 && currentStep > 0) {
       message.warning('Cannot go back to selection after payment has started');
       return;
     }
-    // Prevent manually going to done step
     if (step === 2) {
       message.warning('Please complete the payment process first');
       return;
@@ -288,16 +263,18 @@ const Retrieval = () => {
         key: 'quantity',
         render: (record) => (
           <div className="quantity-controls">
-            <Button 
-              icon={<FaMinus />} 
+            <Button
+              icon={<FaMinus />}
               onClick={() => handleUpdateQuantity(record.ProductID, record.retrievedQuantity - 1)}
               disabled={record.retrievedQuantity <= 1}
+              title="Decrease quantity"
             />
             <span>{record.retrievedQuantity}</span>
-            <Button 
-              icon={<FaPlus />} 
+            <Button
+              icon={<FaPlus />}
               onClick={() => handleUpdateQuantity(record.ProductID, record.retrievedQuantity + 1)}
               disabled={record.retrievedQuantity >= record.Quantity}
+              title="Increase quantity"
             />
           </div>
         ),
@@ -311,11 +288,12 @@ const Retrieval = () => {
         title: 'Action',
         key: 'action',
         render: (record) => (
-          <Button 
-            type="text" 
-            danger 
-            icon={<FaTrash />} 
+          <Button
+            type="text"
+            danger
+            icon={<FaTrash />}
             onClick={() => handleRemoveFromCart(record.ProductID)}
+            title="Remove from cart"
           />
         ),
       },
@@ -324,12 +302,13 @@ const Retrieval = () => {
     return (
       <div className="cart-section">
         <h2>Selected Products</h2>
-        <Table 
-          columns={columns} 
+        <Table
+          columns={columns}
           dataSource={selectedProducts}
           rowKey="ProductID"
           pagination={false}
           className="cart-table"
+          rowClassName={(record, index) => index % 2 === 0 ? 'table-row-even' : 'table-row-odd'}
         />
         <div className="cart-summary">
           <div className="summary-row">
@@ -344,12 +323,13 @@ const Retrieval = () => {
             <span>Total Amount:</span>
             <span>₹{(selectedProducts.reduce((sum, p) => sum + p.totalPrice, 0) * 1.18).toFixed(2)}</span>
           </div>
-          <Button 
-            type="primary" 
-            size="large" 
+          <Button
+            type="primary"
+            size="large"
             className="proceed-btn"
             onClick={handleProceedToPayment}
             disabled={selectedProducts.length === 0}
+            title="Proceed to payment"
           >
             Proceed to Payment
           </Button>
@@ -370,28 +350,26 @@ const Retrieval = () => {
             <span>{totalAmount.toFixed(2)}</span>
           </div>
         </div>
-
         <div className="payment-methods">
-          <Radio.Group 
-            value={paymentMethod} 
+          <Radio.Group
+            value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="payment-options"
           >
-            <Radio.Button value="card" className="payment-option">
+            <Radio.Button value="card" className="payment-option" title="Pay with Credit/Debit Card">
               <FaCreditCard /> Credit/Debit Card
             </Radio.Button>
-            <Radio.Button value="paypal" className="payment-option">
+            <Radio.Button value="paypal" className="payment-option" title="Pay with PayPal">
               <FaPaypal /> PayPal
             </Radio.Button>
-            <Radio.Button value="gpay" className="payment-option">
+            <Radio.Button value="gpay" className="payment-option" title="Pay with Google Pay">
               <FaGooglePay /> Google Pay
             </Radio.Button>
-            <Radio.Button value="apple" className="payment-option">
+            <Radio.Button value="apple" className="payment-option" title="Pay with Apple Pay">
               <FaApplePay /> Apple Pay
             </Radio.Button>
           </Radio.Group>
         </div>
-
         <div className="payment-summary">
           <div className="summary-item">
             <span>Subtotal</span>
@@ -412,31 +390,25 @@ const Retrieval = () => {
 
   return (
     <div className="retrieval-container">
+      {isLoading && (
+        <div className="loading-overlay">
+          <Spin indicator={<FaSpinner className="spinner" size={48} />} tip="Loading products..." />
+        </div>
+      )}
       <header className="retrieval-header">
-        <h1>Item Retrieval</h1>
-        <p>Retrieve products by name or ID</p>
+        <h1><FaBox /> Item Retrieval</h1>
+        <p>Retrieve products by name or ID with ease</p>
       </header>
-
       <Steps
         current={currentStep}
         items={[
-          {
-            title: 'Select Items',
-            description: 'Add products to cart',
-          },
-          {
-            title: 'Payment',
-            description: 'Complete payment',
-          },
-          {
-            title: 'Done',
-            description: 'Transaction complete',
-          },
+          { title: 'Select Items', description: 'Add products to cart' },
+          { title: 'Payment', description: 'Complete payment' },
+          { title: 'Done', description: 'Transaction complete' },
         ]}
         className="retrieval-steps"
         onChange={handleStepChange}
       />
-
       <div className="retrieval-content">
         {currentStep === 0 && (
           <>
@@ -469,10 +441,11 @@ const Retrieval = () => {
                 <div className="form-group">
                   <label>
                     <FaSearch /> Item ID/Name
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="scan-toggle"
                       onClick={handleScanToggle}
+                      title={formData.scanMode ? 'Switch to manual entry' : 'Scan QR code'}
                     >
                       <FaQrcode /> {formData.scanMode ? 'Manual Entry' : 'Scan QR'}
                     </button>
@@ -491,13 +464,14 @@ const Retrieval = () => {
                       onSelect={handleSelect}
                       value={formData.itemId}
                       onChange={(value) => {
-                        setFormData({...formData, itemId: value});
+                        setFormData({ ...formData, itemId: value });
                         setItemError(null);
                       }}
                       placeholder="Search by product name or ID"
                       className={itemError ? 'error-input' : ''}
                       style={{ width: '100%' }}
                       dropdownClassName="product-dropdown"
+                      aria-label="Search product by name or ID"
                     />
                   )}
                 </div>
@@ -508,17 +482,19 @@ const Retrieval = () => {
                     min="1"
                     value={formData.quantity}
                     onChange={(e) => {
-                      setFormData({...formData, quantity: e.target.value});
+                      setFormData({ ...formData, quantity: e.target.value });
                       setQuantityError(null);
                     }}
                     required
                     className={quantityError ? 'error-input' : ''}
+                    aria-label="Enter quantity"
                   />
                 </div>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="submit-btn"
                   disabled={isRetrieving}
+                  title="Add product to cart"
                 >
                   {isRetrieving ? 'Adding...' : 'Add to Cart'}
                 </button>
@@ -527,26 +503,27 @@ const Retrieval = () => {
             <CartTable />
           </>
         )}
-
         {currentStep === 1 && (
           <div className="payment-section">
             <PaymentSection />
             <div className="payment-actions">
-              <Button 
-                type="default" 
+              <Button
+                type="default"
                 size="large"
                 onClick={() => setCurrentStep(0)}
                 className="back-btn"
                 disabled={isProcessingPayment}
+                title="Return to cart"
               >
                 Back to Cart
               </Button>
-              <Button 
-                type="primary" 
-                size="large" 
+              <Button
+                type="primary"
+                size="large"
                 className="pay-button"
                 onClick={handlePayment}
                 disabled={isProcessingPayment}
+                title="Complete payment"
               >
                 {isProcessingPayment ? (
                   <span className="loading-payment">
@@ -559,21 +536,21 @@ const Retrieval = () => {
             </div>
           </div>
         )}
-
         {currentStep === 2 && (
           <div className="success-section">
             <div className="success-content">
               <FaCheckCircle size={64} color="#2ecc71" />
               <h2>Payment Successful!</h2>
               <p>Your order has been processed successfully.</p>
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 size="large"
                 onClick={() => {
                   setSelectedProducts([]);
                   setCurrentStep(0);
                   setPaymentMethod('card');
                 }}
+                title="Start a new order"
               >
                 Start New Order
               </Button>

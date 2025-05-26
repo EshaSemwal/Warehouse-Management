@@ -10,7 +10,8 @@ import {
   FaChartPie,
   FaSignInAlt,
   FaUserPlus,
-  FaBars
+  FaBars,
+  FaUserCog
 } from "react-icons/fa";
 import "./Navbar.css";
 
@@ -76,6 +77,12 @@ const Navbar = () => {
                   <FaCog className="nav-icon"  />
                   <span>Settings</span>
                 </a>
+              </li>
+              <li className="nav-item">
+                <a href="./AboutUs" className="nav-link">
+                  <FaUserCog className="nav-icon"  />
+                  <span>About Us</span>
+                  </a>
               </li>
             </ul>
           </div>

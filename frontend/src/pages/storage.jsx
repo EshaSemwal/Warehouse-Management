@@ -8,13 +8,16 @@ import {
   FaCamera,
   FaWarehouse,
   FaCheckCircle,
-  FaChartPie
+  FaChartPie,
+  FaPlus,
+  FaPercentage,
+  FaBalanceScale
 } from 'react-icons/fa';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { message, Progress, Tooltip } from 'antd';
 import './storage.css';
-import { message } from 'antd';
 
-const AddItems = () => {
+const StorageOptimization = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -42,50 +45,60 @@ const AddItems = () => {
   const [draggingItem, setDraggingItem] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
 
-  // Helper to fetch bins and update stats
   const fetchBinsAndStats = async () => {
-    const binsRes = await fetch('http://localhost:8000/api/inventory/rack-capacity');
-    const binsData = await binsRes.json();
-    setBins(binsData);
-    // Calculate stats immediately after fetching
-    if (binsData.length === 0) {
+    try {
+      const binsRes = await fetch('http://localhost:8000/api/inventory/rack-capacity');
+      const binsData = await binsRes.json();
+      setBins(binsData);
+      
+      if (binsData.length === 0) {
+        setWarehouseStats({
+          totalRacks: 0,
+          racksUsed: 0,
+          totalWeightCapacity: 0,
+          totalUsedWeight: 0,
+          percentRacksUsed: 0,
+          percentSpaceUsed: 0
+        });
+        return;
+      }
+      
+      const totalRacks = binsData.length;
+      const racksUsed = binsData.filter(r => r.used_weight > 0).length;
+      const totalWeightCapacity = totalRacks * 100;
+      const totalUsedWeight = binsData.reduce((sum, r) => sum + r.used_weight, 0);
+      const percentSpaceUsed = totalWeightCapacity > 0 ? Math.round((totalUsedWeight / totalWeightCapacity) * 100) : 0;
+      const percentRacksUsed = totalRacks > 0 ? Math.round((racksUsed / totalRacks) * 100) : 0;
+      
       setWarehouseStats({
-        totalRacks: 0,
-        racksUsed: 0,
-        totalWeightCapacity: 0,
-        totalUsedWeight: 0,
-        percentRacksUsed: 0,
-        percentSpaceUsed: 0
+        totalRacks,
+        racksUsed,
+        totalWeightCapacity,
+        totalUsedWeight,
+        percentRacksUsed,
+        percentSpaceUsed
       });
-      return;
+    } catch (error) {
+      message.error('Failed to fetch rack data');
     }
-    const totalRacks = binsData.length;
-    const racksUsed = binsData.filter(r => r.used_weight > 0).length;
-    const totalWeightCapacity = totalRacks * 100;
-    const totalUsedWeight = binsData.reduce((sum, r) => sum + r.used_weight, 0);
-    const percentSpaceUsed = totalWeightCapacity > 0 ? Math.round((totalUsedWeight / totalWeightCapacity) * 100) : 0;
-    const percentRacksUsed = totalRacks > 0 ? Math.round((racksUsed / totalRacks) * 100) : 0;
-    setWarehouseStats({
-      totalRacks,
-      racksUsed,
-      totalWeightCapacity,
-      totalUsedWeight,
-      percentRacksUsed,
-      percentSpaceUsed
-    });
   };
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/inventory/')
-      .then(res => res.json())
-      .then(data => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/inventory/');
+        const data = await res.json();
         const uniqueCategories = Array.from(new Set(data.map(item => item.Category)));
         setCategories(uniqueCategories);
-      });
-    fetchBinsAndStats();
+        await fetchBinsAndStats();
+      } catch (error) {
+        message.error('Failed to fetch inventory data');
+      }
+    };
+    
+    fetchData();
   }, []);
 
-  // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -94,10 +107,10 @@ const AddItems = () => {
     }
   };
 
-  // On add/update, always re-fetch bins and stats
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsAdding(true);
+    
     const category = showNewCategory ? formData.newCategory : formData.category;
     const itemData = {
       ProductID: `P${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
@@ -109,17 +122,20 @@ const AddItems = () => {
       IndividualWeight_kg: Number(formData.weight),
       TotalWeight_kg: Number(formData.weight) * Number(formData.quantity)
     };
+
     try {
       const res = await fetch('http://localhost:8000/api/inventory/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(itemData)
       });
+
       if (!res.ok) {
         if (res.status === 422 || res.status === 400) {
           const invRes = await fetch('http://localhost:8000/api/inventory/');
           const invData = await invRes.json();
           const existing = invData.find(i => i.ProductName === formData.name);
+          
           if (existing) {
             const patchRes = await fetch(`http://localhost:8000/api/inventory/${existing.ProductID}`, {
               method: 'PATCH',
@@ -134,22 +150,24 @@ const AddItems = () => {
           throw new Error('Failed to add item');
         }
       }
+
       // Refresh categories
       const catRes = await fetch('http://localhost:8000/api/inventory/');
       const catData = await catRes.json();
       const uniqueCategories = Array.from(new Set(catData.map(item => item.Category)));
       setCategories(uniqueCategories);
-      // Always re-fetch bins and stats after add/update
+      
       await fetchBinsAndStats();
       setFormData({ name: '', weight: '', category: '', newCategory: '', quantity: 1, price: '' });
       setShowNewCategory(false);
+      message.success('Item added successfully');
     } catch (err) {
       message.error(err.message);
+    } finally {
+      setIsAdding(false);
     }
-    setTimeout(() => setIsAdding(false), 2000);
   };
 
-  // Drag and drop handlers
   const onDragStart = (start) => {
     setDraggingItem(start.draggableId);
   };
@@ -165,197 +183,248 @@ const AddItems = () => {
     setDraggingItem(null);
   };
 
+  const getBinColor = (percentUsed) => {
+    if (percentUsed >= 90) return '#f56565'; // Red for full
+    if (percentUsed >= 70) return '#ed8936'; // Orange for nearly full
+    return '#48bb78'; // Green for available
+  };
+
   return (
-    <div className="add-items-container">
-      <header className="page-header">
-        <h1><FaBoxOpen /> Storage Optimization</h1>
-        <p>Add new items and optimize warehouse placement</p>
+    <div className="storage-optimization">
+      <header className="storage-header">
+        <h1><FaWarehouse /> Storage Optimization</h1>
+        <p className="subtitle">Maximize warehouse efficiency with intelligent item placement</p>
       </header>
 
-      <div className="content-grid">
-        {/* Add Item Form */}
-        <section className="form-section">
-          <h2><FaBoxOpen /> Add New Item</h2>
-          <form onSubmit={handleSubmit}>
+      <div className="storage-content">
+        {/* Left Column - Form */}
+        <section className="add-item-section">
+          <div className="section-header">
+            <h2><FaBoxOpen /> Add New Inventory Item</h2>
+            <p>Enter item details to optimize storage placement</p>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="item-form">
             <div className="form-group">
-              <label>Item Name</label>
+              <label htmlFor="item-name">Item Name</label>
               <input
+                id="item-name"
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
+                placeholder="Enter product name"
                 required
               />
             </div>
-            <div className="form-group">
-              <label><FaWeightHanging /> Weight (kg)</label>
-              <input
-                type="number"
-                name="weight"
-                value={formData.weight}
-                onChange={handleChange}
-                required
-              />
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="item-weight"><FaWeightHanging /> Weight (kg)</label>
+                <input
+                  id="item-weight"
+                  type="number"
+                  name="weight"
+                  value={formData.weight}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0.01"
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="item-quantity">Quantity</label>
+                <input
+                  id="item-quantity"
+                  type="number"
+                  name="quantity"
+                  min="1"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
             </div>
+            
             <div className="form-group">
-              <label><FaBoxes /> Category</label>
+              <label htmlFor="item-category"><FaBoxes /> Category</label>
               <select
+                id="item-category"
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
                 required
               >
-                <option value="">Select Category</option>
+                <option value="">Select a category</option>
                 {categories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
-                <option value="Other">Other</option>
+                <option value="Other">Other category...</option>
               </select>
+              
               {showNewCategory && (
                 <input
                   type="text"
                   name="newCategory"
-                  placeholder="Enter new category"
                   value={formData.newCategory}
                   onChange={handleChange}
+                  placeholder="Enter new category name"
                   required
+                  className="new-category-input"
                 />
               )}
             </div>
+            
             <div className="form-group">
-              <label>Quantity</label>
+              <label htmlFor="item-price">Price (₹)</label>
               <input
-                type="number"
-                name="quantity"
-                min="1"
-                value={formData.quantity}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Price</label>
-              <input
+                id="item-price"
                 type="number"
                 name="price"
                 min="0.01"
                 step="0.01"
                 value={formData.price}
                 onChange={handleChange}
+                placeholder="0.00"
                 required
               />
             </div>
-            <button type="submit" className={`submit-btn${isAdding ? ' loading' : ''}`} disabled={isAdding}>
-              {isAdding ? 'Adding item...' : 'Add Item'}
+            
+            <button type="submit" className="submit-btn" disabled={isAdding}>
+              {isAdding ? (
+                <span>Adding Item...</span>
+              ) : (
+                <>
+                  <FaPlus /> Add Inventory Item
+                </>
+              )}
             </button>
           </form>
         </section>
 
-        {/* Storage Optimization Section */}
+        {/* Right Column - Visualization */}
         <section className="optimization-section">
-          {/* Algorithm Suggestions */}
-          {suggestedBins.length > 0 && (
-            <div className="suggestions-box">
-              <h3><FaCheckCircle /> Recommended Storage Locations</h3>
-              {suggestedBins.map((bin, index) => (
-                <div key={bin.id} className={`suggestion ${index === 0 ? 'best' : ''}`}>
-                  <h4>{bin.name}</h4>
-                  <div className="suggestion-stats">
-                    <div>
-                      <span>Space Available:</span>
-                      <progress value={bin.capacity - bin.used} max={bin.capacity}></progress>
-                      <span>{bin.capacity - bin.used}%</span>
-                    </div>
-                    <div>
-                      <span>Weight Available:</span>
-                      <span>{bin.weightLimit - bin.currentWeight}kg</span>
-                    </div>
-                  </div>
-                  {index === 0 && <div className="best-badge">Best Match</div>}
-                </div>
-              ))}
+          {/* Warehouse Statistics */}
+          <div className="stats-card">
+            <div className="stats-header">
+              <h3><FaChartPie /> Warehouse Capacity</h3>
+              <Tooltip title="Based on current inventory and rack configuration">
+                <span className="info-badge">i</span>
+              </Tooltip>
             </div>
-          )}
-
-          {/* Dynamic Storage Bins */}
-          <div className="bin-visualization">
-            <h3><FaWarehouse /> Storage Racks</h3>
-            <p>Each rack shows % emptiness and its capacity</p>
-            <div className="bins-container">
-              {bins.length === 0 ? (
-                <div style={{ color: '#888', textAlign: 'center', padding: '1rem' }}>
-                  No racks available.
+            
+            <div className="stats-grid">
+              <div className="stat-item">
+                <div className="stat-icon"><FaPercentage /></div>
+                <div className="stat-value">{warehouseStats.percentSpaceUsed || 0}%</div>
+                <div className="stat-label">Space Utilized</div>
+              </div>
+              
+              <div className="stat-item">
+                <div className="stat-icon"><FaWarehouse /></div>
+                <div className="stat-value">
+                  {warehouseStats.racksUsed}/{warehouseStats.totalRacks}
                 </div>
-              ) : (() => {
-                // Separate bins by type
-                const emptyBins = bins.filter(bin => bin.used_weight === 0);
-                const filledBins = bins.filter(bin => bin.used_weight >= 99.99);
-                const partialBins = bins.filter(bin => bin.used_weight > 0 && bin.used_weight < 99.99);
-
-                // Helper to get random items from an array
-                function getRandomItems(arr, count) {
-                  const shuffled = arr.slice().sort(() => 0.5 - Math.random());
-                  return shuffled.slice(0, count);
-                }
-
-                let selected = [];
-                // Try to include at least one of each type if available
-                if (emptyBins.length > 0) selected.push(getRandomItems(emptyBins, 1)[0]);
-                if (partialBins.length > 0) selected.push(getRandomItems(partialBins, 1)[0]);
-                if (filledBins.length > 0) selected.push(getRandomItems(filledBins, 1)[0]);
-
-                // Fill the rest up to 10 with random bins from all bins, excluding already selected
-                const alreadySelectedIds = new Set(selected.filter(Boolean).map(b => b.id));
-                const remainingBins = bins.filter(b => !alreadySelectedIds.has(b.id));
-                const needed = 10 - selected.length;
-                selected = selected.filter(Boolean).concat(getRandomItems(remainingBins, needed));
-
-                // Shuffle final selection for randomness
-                selected = selected.sort(() => 0.5 - Math.random());
-
-                // Only show up to 10
-                return selected.slice(0, 10).map((bin) => {
-                  const percentEmpty = 100 - Math.round((bin.used_weight / 100) * 100);
-                  return (
-                    <div key={bin.id} className="bin-card">
-                      <div className="bin-header">
-                        <h4>{bin.zone}{bin.shelf}-{bin.rack}</h4>
-                        <div className="bin-status">
-                          <span className={`capacity ${percentEmpty < 30 ? 'warning' : ''}`}>
-                            {percentEmpty}% empty
-                          </span>
-                          <span className="weight">
-                            {bin.used_weight.toFixed(1)}/100kg
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
+                <div className="stat-label">Racks Used</div>
+              </div>
+              
+              <div className="stat-item">
+                <div className="stat-icon"><FaBalanceScale /></div>
+                <div className="stat-value">
+                  {(warehouseStats.totalUsedWeight/1000).toFixed(2)}T
+                </div>
+                <div className="stat-label">Weight Stored</div>
+              </div>
+            </div>
+            
+            <div className="capacity-bar">
+              <Progress 
+                percent={warehouseStats.percentSpaceUsed} 
+                strokeColor={getBinColor(warehouseStats.percentSpaceUsed)}
+                showInfo={false}
+              />
+              <div className="capacity-labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
             </div>
           </div>
 
-          {/* Warehouse Stats */}
-          <div className="warehouse-stats">
-            <h3><FaChartPie /> Warehouse Capacity</h3>
-            <div className="stats-grid">
-              <div className="stat-item">
-                <div className="stat-value">{warehouseStats.percentSpaceUsed || 0}%</div>
-                <div className="stat-label">Total Space Used</div>
+          {/* Storage Recommendations */}
+          {suggestedBins.length > 0 && (
+            <div className="recommendation-card">
+              <div className="recommendation-header">
+                <h3><FaCheckCircle /> Recommended Locations</h3>
+                <span className="badge">{suggestedBins.length} suggestions</span>
               </div>
-              <div className="stat-item">
-                <div className="stat-value">{warehouseStats.racksUsed}/{warehouseStats.totalRacks}</div>
-                <div className="stat-label">Racks Used</div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-value">{(warehouseStats.totalUsedWeight/1000).toFixed(2)}T/{(warehouseStats.totalWeightCapacity/1000).toFixed(2)}T</div>
-                <div className="stat-label">Weight Capacity Used</div>
+              
+              <div className="recommendation-list">
+                {suggestedBins.map((bin, index) => (
+                  <div key={bin.id} className={`recommendation-item ${index === 0 ? 'best-match' : ''}`}>
+                    <div className="location-id">{bin.zone}{bin.shelf}-{bin.rack}</div>
+                    <div className="location-stats">
+                      <div className="stat">
+                        <span>Space:</span>
+                        <Progress 
+                          percent={100 - (bin.capacity - bin.used)} 
+                          strokeColor={getBinColor(100 - (bin.capacity - bin.used))}
+                          showInfo={false}
+                        />
+                        <span>{bin.capacity - bin.used}% available</span>
+                      </div>
+                      <div className="stat">
+                        <span>Weight:</span>
+                        <span>{bin.weightLimit - bin.currentWeight}kg available</span>
+                      </div>
+                    </div>
+                    {index === 0 && <div className="best-tag">Best Match</div>}
+                  </div>
+                ))}
               </div>
             </div>
-            {bins.length > 0 && bins.every(b => b.used_weight === 0) && (
-              <div style={{color:'#888',textAlign:'center',marginTop:'1rem'}}>
-                No racks are currently filled. Add products to see warehouse usage.
+          )}
+
+          {/* Rack Visualization */}
+          <div className="rack-visualization">
+            <div className="section-header">
+              <h3><FaWarehouse /> Rack Availability</h3>
+              <p>Visual representation of current storage utilization</p>
+            </div>
+            
+            {bins.length === 0 ? (
+              <div className="empty-state">
+                <p>No rack data available. Please add inventory items.</p>
+              </div>
+            ) : (
+              <div className="rack-grid">
+                {bins.slice(0, 6).map((bin) => {
+                  const percentUsed = Math.round((bin.used_weight / 100) * 100);
+                  return (
+                    <div key={bin.id} className="rack-card">
+                      <div className="rack-header">
+                        <span className="rack-id">{bin.zone}{bin.shelf}-{bin.rack}</span>
+                        <span className="rack-percent" style={{ color: getBinColor(percentUsed) }}>
+                          {percentUsed}% used
+                        </span>
+                      </div>
+                      <div className="rack-visual">
+                        <div 
+                          className="rack-used-space" 
+                          style={{
+                            height: `${percentUsed}%`,
+                            backgroundColor: getBinColor(percentUsed)
+                          }}
+                        />
+                      </div>
+                      <div className="rack-weight">
+                        {bin.used_weight.toFixed(1)} / 100 kg
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -365,4 +434,4 @@ const AddItems = () => {
   );
 };
 
-export default AddItems;
+export default StorageOptimization;
